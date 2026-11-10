@@ -26,8 +26,6 @@ def handler(event, context):
     course_id  = event['courseId']
     student_id = event['studentId']
 
-    log.info(json.dumps({'action': 'step_fn_input', 'tenantId': str(tenant_id), 'courseId': str(course_id), 'studentId': str(student_id), 'tenantIdType': type(tenant_id).__name__}))
-
     enrollment_id = f'ENR-{uuid.uuid4()}'
     event_id      = str(uuid.uuid4())
     now           = _now_iso()
@@ -71,6 +69,7 @@ def handler(event, context):
                 'Put': {
                     'TableName': table.name,
                     'Item':      enrollment_ddb,
+                    'ConditionExpression': 'attribute_not_exists(enrollmentId)',
                 },
             },
             {
@@ -90,8 +89,7 @@ def handler(event, context):
                 raise EnrollmentDuplicate(
                     f'Student {student_id} is already enrolled in course {course_id}'
                 )
-            full_reasons = [{'Code': r.get('Code'), 'Message': r.get('Message')} for r in reasons]
-            log.error(json.dumps({'action': 'enrollment_transaction_cancelled', 'studentId': student_id, 'courseId': course_id, 'tenantId': str(tenant_id), 'cancellationReasons': full_reasons}))
+            log.error(json.dumps({'action': 'enrollment_transaction_cancelled', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id, 'cancellationReasons': [r.get('Code') for r in reasons]}))
         else:
             log.error(json.dumps({'action': 'enrollment_transaction_error', 'studentId': student_id, 'courseId': course_id, 'error': str(e)}))
         raise
