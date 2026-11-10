@@ -69,7 +69,8 @@ def handler(event, context):
                 'Put': {
                     'TableName': table.name,
                     'Item':      _ddb(enrollment_item),
-                    'ConditionExpression': 'attribute_not_exists(pk)',
+                    'ConditionExpression': 'attribute_not_exists(#pk)',
+                    'ExpressionAttributeNames': {'#pk': 'pk'},
                 },
             },
             {
