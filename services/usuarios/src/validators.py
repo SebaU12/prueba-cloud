@@ -25,11 +25,11 @@ def handler(event, context):
 
     Lanza excepción nombrada si falla — Step Functions la captura con Catch.
     """
-    tenant_id = event.get('tenantId')
-    user_id   = event.get('userId')
+    tenant_id  = event.get('tenantId')
+    user_id    = event.get('studentId') or event.get('userId')
 
     if not tenant_id or not user_id:
-        raise ValidationError('Missing tenantId or userId')
+        raise ValidationError('Missing tenantId or studentId')
 
     response = table.get_item(
         Key={
