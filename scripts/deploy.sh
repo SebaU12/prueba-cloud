@@ -30,7 +30,7 @@ get_output() {
 echo ""
 echo "[1/6] Desplegando infrastructure..."
 cd "$ROOT_DIR/infrastructure"
-serverless deploy --stage "$STAGE" --region "$REGION"
+serverless deploy --stage "$STAGE" --region "$REGION" --force
 echo "      ✓ infrastructure desplegado"
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ echo "      ✓ infrastructure desplegado"
 echo ""
 echo "[2/6] Desplegando usuarios..."
 cd "$ROOT_DIR/services/usuarios"
-serverless deploy --stage "$STAGE" --region "$REGION"
+serverless deploy --stage "$STAGE" --region "$REGION" --force
 
 AUTHORIZER_LAMBDA_ARN=$(get_output "lms-usuarios-$STAGE" "AuthorizerLambdaArn")
 VALIDATOR_USUARIOS_ARN=$(get_output "lms-usuarios-$STAGE" "ValidatorUsuariosArn")
@@ -56,7 +56,7 @@ echo "        ValidatorUsuariosArn:  $VALIDATOR_USUARIOS_ARN"
 echo ""
 echo "[3/6] Desplegando cursos..."
 cd "$ROOT_DIR/services/cursos"
-serverless deploy --stage "$STAGE" --region "$REGION"
+serverless deploy --stage "$STAGE" --region "$REGION" --force
 
 VALIDATOR_CURSOS_ARN=$(get_output "lms-cursos-$STAGE" "ValidatorCursosArn")
 export VALIDATOR_CURSOS_ARN
@@ -70,7 +70,7 @@ echo "        ValidatorCursosArn:    $VALIDATOR_CURSOS_ARN"
 echo ""
 echo "[4/6] Desplegando matriculas..."
 cd "$ROOT_DIR/services/matriculas"
-serverless deploy --stage "$STAGE" --region "$REGION"
+serverless deploy --stage "$STAGE" --region "$REGION" --force
 echo "      ✓ matriculas desplegado"
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ echo "      ✓ matriculas desplegado"
 echo ""
 echo "[5/6] Desplegando contenidos..."
 cd "$ROOT_DIR/services/contenidos"
-serverless deploy --stage "$STAGE" --region "$REGION"
+serverless deploy --stage "$STAGE" --region "$REGION" --force
 echo "      ✓ contenidos desplegado"
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ echo "      ✓ contenidos desplegado"
 echo ""
 echo "[6/6] Desplegando evaluaciones..."
 cd "$ROOT_DIR/services/evaluaciones"
-serverless deploy --stage "$STAGE" --region "$REGION"
+serverless deploy --stage "$STAGE" --region "$REGION" --force
 echo "      ✓ evaluaciones desplegado"
 
 # ──────────────────────────────────────────────────────────────────────────────
