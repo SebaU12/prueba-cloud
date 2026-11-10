@@ -41,6 +41,51 @@ scripts/
 | TENANT_B | admin@tenant-b.edu | `ADMIN_B_PASS` |
 | TENANT_C | admin@tenant-c.edu | `ADMIN_C_PASS` |
 
+## Configuración antes de clonar
+
+Dos valores están hardcodeados en todos los `serverless.yml` y deben actualizarse antes de desplegar:
+
+### 1. Organización de Serverless Framework
+
+Cada `serverless.yml` tiene en la línea 1:
+
+```yaml
+org: sebastianlizarraga
+```
+
+Reemplazar con tu organización de [Serverless Dashboard](https://app.serverless.com/), o eliminar la línea si no usas el dashboard.
+
+Archivos a editar:
+```
+infrastructure/serverless.yml
+services/usuarios/serverless.yml
+services/cursos/serverless.yml
+services/matriculas/serverless.yml
+services/contenidos/serverless.yml
+services/evaluaciones/serverless.yml
+```
+
+### 2. IAM Role
+
+Cada `serverless.yml` referencia un rol de AWS Academy:
+
+```yaml
+role: arn:aws:iam::198909467842:role/LabRole
+```
+
+Reemplazar `198909467842` con tu Account ID y `LabRole` con el nombre del rol IAM que tenga permisos sobre Lambda, DynamoDB, S3, SNS, SQS y Step Functions. En AWS Academy usar el `LabRole` de tu propia cuenta.
+
+Buscar y reemplazar en todos los `serverless.yml`:
+```bash
+# Ver todas las ocurrencias
+grep -r "198909467842" .
+
+# Reemplazar (Linux/Mac)
+find . -name "serverless.yml" -exec sed -i 's/198909467842/TU_ACCOUNT_ID/g' {} +
+```
+
+---
+
 ## Despliegue
 
 ### Prerequisitos
