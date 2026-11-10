@@ -4,6 +4,7 @@ import time
 import uuid
 
 from boto3.dynamodb.types import TypeSerializer as _TS
+from botocore.exceptions import ClientError
 
 dynamodb = boto3.resource('dynamodb')
 table    = dynamodb.Table(os.environ['TABLE_NAME'])
@@ -96,12 +97,13 @@ def handler(event, context):
                 },
             },
         ])
-    except _ddb_cli.exceptions.TransactionCanceledException as e:
-        reasons = e.response.get('CancellationReasons', [])
-        if reasons and reasons[0].get('Code') == 'ConditionalCheckFailed':
-            raise EnrollmentDuplicate(
-                f'Student {student_id} is already enrolled in course {course_id}'
-            )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'TransactionCanceledException':
+            reasons = e.response.get('CancellationReasons', [])
+            if any(r.get('Code') == 'ConditionalCheckFailed' for r in reasons):
+                raise EnrollmentDuplicate(
+                    f'Student {student_id} is already enrolled in course {course_id}'
+                )
         raise
 
     return {
