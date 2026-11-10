@@ -14,7 +14,7 @@ provider:
     TABLE_NAME: lms-enrollments-${sls:stage}
     SNS_TOPIC_ARN: ${cf:lms-infrastructure-${sls:stage}.SnsTopicArn}
     SQS_QUEUE_URL: ${cf:lms-infrastructure-${sls:stage}.SqsQueueUrl}
-    STATE_MACHINE_ARN: !Ref EnrollmentMachineStateMachine
+    STATE_MACHINE_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:lms-enrollment-${sls:stage}"
 
 plugins:
   - serverless-step-functions
