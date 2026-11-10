@@ -3,8 +3,16 @@ import os
 import time
 import uuid
 
+from boto3.dynamodb.types import TypeSerializer as _TS
+
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table(os.environ['TABLE_NAME'])
+table    = dynamodb.Table(os.environ['TABLE_NAME'])
+_ddb_cli = dynamodb.meta.client
+_ser     = _TS()
+
+def _ddb(item):
+    """Convierte un dict Python al formato nativo de DynamoDB."""
+    return {k: _ser.serialize(v) for k, v in item.items()}
 
 
 def handler(event, context):
@@ -73,24 +81,22 @@ def handler(event, context):
     }
 
     try:
-        table.transact_write_items(
-            TransactItems=[
-                {
-                    'Put': {
-                        'TableName': table.name,
-                        'Item':      enrollment_item,
-                        'ConditionExpression': 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-                    },
+        _ddb_cli.transact_write_items(TransactItems=[
+            {
+                'Put': {
+                    'TableName': table.name,
+                    'Item':      _ddb(enrollment_item),
+                    'ConditionExpression': 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
                 },
-                {
-                    'Put': {
-                        'TableName': table.name,
-                        'Item':      outbox_item,
-                    },
+            },
+            {
+                'Put': {
+                    'TableName': table.name,
+                    'Item':      _ddb(outbox_item),
                 },
-            ]
-        )
-    except dynamodb.meta.client.exceptions.TransactionCanceledException as e:
+            },
+        ])
+    except _ddb_cli.exceptions.TransactionCanceledException as e:
         reasons = e.response.get('CancellationReasons', [])
         if reasons and reasons[0].get('Code') == 'ConditionalCheckFailed':
             raise EnrollmentDuplicate(

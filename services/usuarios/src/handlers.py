@@ -220,41 +220,27 @@ def create_user(event, context):
     hash_b64, salt_b64 = _hash_password(password)
     now = _now_iso()
 
-    table.transact_write(Items=[
-        {
-            'Put': {
-                'TableName': table.name,
-                'Item': {
-                    'pk':                 f'TENANT#{tenant_id}',
-                    'sk':                 f'USER#{user_id}',
-                    'entityType':         'USER',
-                    'userId':             user_id,
-                    'tenantId':           tenant_id,
-                    'email':              email,
-                    'role':               new_role,
-                    'status':             'active',
-                    'passwordHashB64':    hash_b64,
-                    'passwordSaltB64':    salt_b64,
-                    'passwordIterations': 310_000,
-                    'failedAttempts':     0,
-                    'createdAt':          now,
-                },
-                'ConditionExpression': 'attribute_not_exists(pk)',
-            },
-        },
-        {
-            'Put': {
-                'TableName': table.name,
-                'Item': {
-                    'pk':       f'EMAIL#{email}',
-                    'sk':       'LOOKUP',
-                    'userId':   user_id,
-                    'tenantId': tenant_id,
-                },
-                'ConditionExpression': 'attribute_not_exists(pk)',
-            },
-        },
-    ])
+    table.put_item(Item={
+        'pk':                 f'TENANT#{tenant_id}',
+        'sk':                 f'USER#{user_id}',
+        'entityType':         'USER',
+        'userId':             user_id,
+        'tenantId':           tenant_id,
+        'email':              email,
+        'role':               new_role,
+        'status':             'active',
+        'passwordHashB64':    hash_b64,
+        'passwordSaltB64':    salt_b64,
+        'passwordIterations': 310_000,
+        'failedAttempts':     0,
+        'createdAt':          now,
+    })
+    table.put_item(Item={
+        'pk':       f'EMAIL#{email}',
+        'sk':       'LOOKUP',
+        'userId':   user_id,
+        'tenantId': tenant_id,
+    })
 
     return _ok({'userId': user_id, 'email': email, 'role': new_role})
 
