@@ -22,7 +22,7 @@ functions:
           path: /v1/evaluations
           method: post
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -36,7 +36,7 @@ functions:
           path: /v1/evaluations
           method: get
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -50,7 +50,7 @@ functions:
           path: /v1/evaluations/{evaluationId}
           method: get
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -64,7 +64,7 @@ functions:
           path: /v1/evaluations/{evaluationId}
           method: patch
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0

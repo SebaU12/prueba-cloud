@@ -1,5 +1,6 @@
 import base64
 import boto3
+import decimal
 import hashlib
 import hmac
 import json
@@ -17,7 +18,8 @@ table = dynamodb.Table(os.environ['TABLE_NAME'])
 # ─── Helpers de evento ────────────────────────────────────────────────────────
 
 def _body(event):
-    return event.get('body') or {}
+    b = event.get('body') or '{}'
+    return json.loads(b) if isinstance(b, str) else (b or {})
 
 def _path(event):
     return event.get('pathParameters') or event.get('params', {}).get('path', {}) or {}
@@ -31,11 +33,27 @@ def _auth(event):
 
 # ─── Helpers de respuesta ─────────────────────────────────────────────────────
 
+_CORS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
+
+class _Enc(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, decimal.Decimal):
+            return int(o) if o == int(o) else float(o)
+        return super().default(o)
+
 def _ok(data):
-    return {'data': data, 'requestId': str(uuid.uuid4())}
+    return {
+        'statusCode': 200,
+        'headers': _CORS,
+        'body': json.dumps({'data': data, 'requestId': str(uuid.uuid4())}, cls=_Enc),
+    }
 
 def _error(code, message):
-    return {'error': {'code': code, 'message': message}, 'requestId': str(uuid.uuid4())}
+    return {
+        'statusCode': 200,
+        'headers': _CORS,
+        'body': json.dumps({'error': {'code': code, 'message': message}, 'requestId': str(uuid.uuid4())}, cls=_Enc),
+    }
 
 
 # ─── Helpers internos ─────────────────────────────────────────────────────────
@@ -66,11 +84,6 @@ def login(event, context):
     body     = _body(event)
     email    = (body.get('email') or '').strip().lower()
     password = body.get('password', '')
-
-    # DEBUG temporal — ver en CloudWatch
-    print(f"DEBUG body type: {type(body)}")
-    print(f"DEBUG email: {repr(email)}")
-    print(f"DEBUG password len: {len(password)}, repr: {repr(password)}")
 
     if not email or not password:
         return _error('INVALID_BODY', 'email and password are required')

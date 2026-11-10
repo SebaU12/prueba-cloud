@@ -23,7 +23,7 @@ functions:
           path: /v1/materials
           method: post
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -37,7 +37,7 @@ functions:
           path: /v1/materials
           method: get
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -51,7 +51,7 @@ functions:
           path: /v1/materials/{contentId}/upload-url
           method: post
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -65,7 +65,7 @@ functions:
           path: /v1/materials/{contentId}/confirm
           method: post
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -79,7 +79,7 @@ functions:
           path: /v1/materials/{contentId}/download-url
           method: get
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0

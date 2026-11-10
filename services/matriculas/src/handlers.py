@@ -1,5 +1,6 @@
 import base64
 import boto3
+import decimal
 import json
 import os
 import uuid
@@ -16,7 +17,8 @@ STATE_MACHINE_ARN = os.environ['STATE_MACHINE_ARN']
 # ─── Helpers de evento ────────────────────────────────────────────────────────
 
 def _body(event):
-    return event.get('body') or {}
+    b = event.get('body') or '{}'
+    return json.loads(b) if isinstance(b, str) else (b or {})
 
 def _query(event):
     return event.get('queryStringParameters') or event.get('params', {}).get('querystring', {}) or {}
@@ -27,11 +29,27 @@ def _auth(event):
 
 # ─── Helpers de respuesta ─────────────────────────────────────────────────────
 
+_CORS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
+
+class _Enc(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, decimal.Decimal):
+            return int(o) if o == int(o) else float(o)
+        return super().default(o)
+
 def _ok(data):
-    return {'data': data, 'requestId': str(uuid.uuid4())}
+    return {
+        'statusCode': 200,
+        'headers': _CORS,
+        'body': json.dumps({'data': data, 'requestId': str(uuid.uuid4())}, cls=_Enc),
+    }
 
 def _error(code, message):
-    return {'error': {'code': code, 'message': message}, 'requestId': str(uuid.uuid4())}
+    return {
+        'statusCode': 200,
+        'headers': _CORS,
+        'body': json.dumps({'error': {'code': code, 'message': message}, 'requestId': str(uuid.uuid4())}, cls=_Enc),
+    }
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────────────

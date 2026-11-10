@@ -29,7 +29,7 @@ functions:
           path: /v1/enrollments
           method: post
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -43,7 +43,7 @@ functions:
           path: /v1/enrollments
           method: get
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0

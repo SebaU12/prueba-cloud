@@ -28,7 +28,7 @@ functions:
           path: /v1/courses
           method: post
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -42,7 +42,7 @@ functions:
           path: /v1/courses
           method: get
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -56,7 +56,7 @@ functions:
           path: /v1/courses/{courseId}
           method: get
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
@@ -70,7 +70,7 @@ functions:
           path: /v1/courses/{courseId}
           method: patch
           cors: true
-          integration: lambda
+
           authorizer:
             arn: ${env:AUTHORIZER_LAMBDA_ARN}
             resultTtlInSeconds: 0
