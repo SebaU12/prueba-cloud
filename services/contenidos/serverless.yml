@@ -1,0 +1,119 @@
+org: sebastianlizarraga
+service: lms-contenidos
+
+provider:
+  name: aws
+  runtime: python3.12
+  memorySize: 1024
+  timeout: 30
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  iam:
+    role: arn:aws:iam::198909467842:role/LabRole
+  environment:
+    TABLE_NAME: lms-contents-${sls:stage}
+    S3_BUCKET: ${cf:lms-infrastructure-${sls:stage}.S3BucketName}
+
+functions:
+
+  createMaterial:
+    handler: src/handlers.create_material
+    events:
+      - http:
+          path: /v1/materials
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  listMaterials:
+    handler: src/handlers.list_materials
+    events:
+      - http:
+          path: /v1/materials
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  getUploadUrl:
+    handler: src/handlers.get_upload_url
+    events:
+      - http:
+          path: /v1/materials/{contentId}/upload-url
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  confirmUpload:
+    handler: src/handlers.confirm_upload
+    events:
+      - http:
+          path: /v1/materials/{contentId}/confirm
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  getDownloadUrl:
+    handler: src/handlers.get_download_url
+    events:
+      - http:
+          path: /v1/materials/{contentId}/download-url
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+resources:
+  Resources:
+
+    TablaContenidos:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: GSI1PK
+            AttributeType: S
+          - AttributeName: GSI1SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        GlobalSecondaryIndexes:
+          - IndexName: GSI_BY_CONTENT
+            KeySchema:
+              - AttributeName: GSI1PK
+                KeyType: HASH
+              - AttributeName: GSI1SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL

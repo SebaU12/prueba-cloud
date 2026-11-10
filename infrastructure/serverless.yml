@@ -1,0 +1,118 @@
+org: sebastianlizarraga
+service: lms-infrastructure
+
+provider:
+  name: aws
+  runtime: python3.12
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  iam:
+    role: arn:aws:iam::198909467842:role/LabRole
+
+resources:
+  Resources:
+
+    # ─── S3 ───────────────────────────────────────────────────────────────────
+    LmsMaterialesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: lms-materiales-${aws:accountId}-${sls:stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - PUT
+              AllowedOrigins:
+                - "*"
+              MaxAge: 300
+
+    # ─── SNS ──────────────────────────────────────────────────────────────────
+    EnrollmentTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: lms-enrollment-created-${sls:stage}
+
+    # ─── SQS DLQ ──────────────────────────────────────────────────────────────
+    EnrollmentDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: lms-enrollment-dlq-${sls:stage}
+        MessageRetentionPeriod: 1209600  # 14 días
+
+    # ─── SQS Queue ────────────────────────────────────────────────────────────
+    EnrollmentQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: lms-enrollment-events-${sls:stage}
+        VisibilityTimeout: 120
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt EnrollmentDLQ.Arn
+          maxReceiveCount: 5
+
+    # ─── SNS → SQS Subscription ───────────────────────────────────────────────
+    EnrollmentSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref EnrollmentTopic
+        Protocol: sqs
+        Endpoint: !GetAtt EnrollmentQueue.Arn
+        RawMessageDelivery: true
+
+    # ─── SQS Policy (permite a SNS enviar mensajes) ───────────────────────────
+    EnrollmentQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref EnrollmentQueue
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: sns.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt EnrollmentQueue.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref EnrollmentTopic
+
+  Outputs:
+
+    S3BucketName:
+      Value: !Ref LmsMaterialesBucket
+      Export:
+        Name: lms-s3-bucket-${sls:stage}
+
+    S3BucketArn:
+      Value: !GetAtt LmsMaterialesBucket.Arn
+      Export:
+        Name: lms-s3-bucket-arn-${sls:stage}
+
+    SnsTopicArn:
+      Value: !Ref EnrollmentTopic
+      Export:
+        Name: lms-sns-topic-${sls:stage}
+
+    SqsQueueArn:
+      Value: !GetAtt EnrollmentQueue.Arn
+      Export:
+        Name: lms-sqs-queue-arn-${sls:stage}
+
+    SqsQueueUrl:
+      Value: !Ref EnrollmentQueue
+      Export:
+        Name: lms-sqs-queue-url-${sls:stage}
+
+    SqsDlqArn:
+      Value: !GetAtt EnrollmentDLQ.Arn
+      Export:
+        Name: lms-sqs-dlq-arn-${sls:stage}

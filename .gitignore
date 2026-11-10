@@ -1,0 +1,33 @@
+# Serverless Framework
+.serverless/
+*/.serverless/
+*/node_modules/
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# AWS credentials (nunca commitear)
+.env
+.env.*
+*.env
+credentials
+
+# Claude Code
+.claude/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

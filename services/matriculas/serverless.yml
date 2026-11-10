@@ -1,0 +1,188 @@
+org: sebastianlizarraga
+service: lms-matriculas
+
+provider:
+  name: aws
+  runtime: python3.12
+  memorySize: 1024
+  timeout: 30
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  iam:
+    role: arn:aws:iam::198909467842:role/LabRole
+  environment:
+    TABLE_NAME: lms-enrollments-${sls:stage}
+    SNS_TOPIC_ARN: ${cf:lms-infrastructure-${sls:stage}.SnsTopicArn}
+    SQS_QUEUE_URL: ${cf:lms-infrastructure-${sls:stage}.SqsQueueUrl}
+    STATE_MACHINE_ARN: !Ref EnrollmentMachineStateMachine
+
+plugins:
+  - serverless-step-functions
+
+functions:
+
+  # ─── HTTP handler: inicia Step Functions Express (síncrono) ──────────────────
+  createEnrollment:
+    handler: src/handlers.create_enrollment
+    events:
+      - http:
+          path: /v1/enrollments
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  listEnrollments:
+    handler: src/handlers.list_enrollments
+    events:
+      - http:
+          path: /v1/enrollments
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  # ─── Invocado por Step Functions (sin HTTP event) ────────────────────────────
+  enrollmentStepFn:
+    handler: src/step_fn.handler
+
+  # ─── DynamoDB Streams → SNS (patrón Outbox) ──────────────────────────────────
+  publishOutbox:
+    handler: src/outbox.publish
+    events:
+      - stream:
+          type: dynamodb
+          arn: !GetAtt TablaMatriculas.StreamArn
+          startingPosition: TRIM_HORIZON
+          filterPatterns:
+            - eventName: [INSERT]
+              dynamodb:
+                NewImage:
+                  entityType:
+                    S: [OUTBOX]
+
+  # ─── SQS consumer (idempotente) ──────────────────────────────────────────────
+  consumeEnrollment:
+    handler: src/consumer.handler
+    events:
+      - sqs:
+          arn: ${cf:lms-infrastructure-${sls:stage}.SqsQueueArn}
+          batchSize: 5
+          functionResponseType: ReportBatchItemFailures
+
+stepFunctions:
+  stateMachines:
+    enrollmentMachine:
+      name: lms-enrollment-${sls:stage}
+      type: EXPRESS
+      definition:
+        Comment: "Valida y crea una matrícula de forma orquestada"
+        StartAt: ValidateStudent
+        States:
+
+          ValidateStudent:
+            Type: Task
+            Resource: ${env:VALIDATOR_USUARIOS_ARN}
+            ResultPath: "$.studentValidation"
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2
+            Catch:
+              - ErrorEquals: ["StudentNotFound", "StudentInactive", "TenantMismatch"]
+                ResultPath: "$.error"
+                Next: EnrollmentFailed
+            Next: ValidateCourse
+
+          ValidateCourse:
+            Type: Task
+            Resource: ${env:VALIDATOR_CURSOS_ARN}
+            ResultPath: "$.courseValidation"
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2
+            Catch:
+              - ErrorEquals: ["CourseNotFound", "CourseNotPublished", "TenantMismatch"]
+                ResultPath: "$.error"
+                Next: EnrollmentFailed
+            Next: CreateEnrollmentRecord
+
+          CreateEnrollmentRecord:
+            Type: Task
+            Resource: !GetAtt EnrollmentStepFnLambdaFunction.Arn
+            ResultPath: "$.enrollment"
+            Retry:
+              - ErrorEquals:
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2
+            Catch:
+              - ErrorEquals: ["EnrollmentDuplicate"]
+                ResultPath: "$.error"
+                Next: EnrollmentFailed
+            Next: EnrollmentSuccess
+
+          EnrollmentSuccess:
+            Type: Succeed
+
+          EnrollmentFailed:
+            Type: Fail
+            CausePath: "$.error.message"
+            ErrorPath: "$.error.code"
+
+resources:
+  Resources:
+
+    TablaMatriculas:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: GSI1PK
+            AttributeType: S
+          - AttributeName: GSI1SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        GlobalSecondaryIndexes:
+          - IndexName: GSI_BY_STUDENT
+            KeySchema:
+              - AttributeName: GSI1PK
+                KeyType: HASH
+              - AttributeName: GSI1SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL

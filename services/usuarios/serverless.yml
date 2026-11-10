@@ -1,0 +1,139 @@
+org: sebastianlizarraga
+service: lms-usuarios
+
+provider:
+  name: aws
+  runtime: python3.12
+  memorySize: 1024
+  timeout: 30
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  iam:
+    role: arn:aws:iam::198909467842:role/LabRole
+  environment:
+    TABLE_NAME: lms-users-${sls:stage}
+
+functions:
+
+  # ─── Authorizer (invocado por API Gateway, sin HTTP event) ───────────────────
+  authorizer:
+    handler: src/authorizer.handler
+
+  # ─── Validator (invocado por Step Functions de Matrículas, sin HTTP event) ───
+  validatorUsuarios:
+    handler: src/validators.handler
+
+  # ─── Endpoints públicos ───────────────────────────────────────────────────────
+  login:
+    handler: src/handlers.login
+    events:
+      - http:
+          path: /v1/auth/login
+          method: post
+          cors: true
+          integration: lambda
+
+  # ─── Endpoints privados ───────────────────────────────────────────────────────
+  logout:
+    handler: src/handlers.logout
+    events:
+      - http:
+          path: /v1/auth/logout
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  getMe:
+    handler: src/handlers.get_me
+    events:
+      - http:
+          path: /v1/me
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  createUser:
+    handler: src/handlers.create_user
+    events:
+      - http:
+          path: /v1/users
+          method: post
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  listUsers:
+    handler: src/handlers.list_users
+    events:
+      - http:
+          path: /v1/users
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  getUser:
+    handler: src/handlers.get_user
+    events:
+      - http:
+          path: /v1/users/{userId}
+          method: get
+          cors: true
+          integration: lambda
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+resources:
+  Resources:
+
+    TablaUsuarios:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+  Outputs:
+
+    AuthorizerLambdaArn:
+      Value: !GetAtt AuthorizerLambdaFunction.Arn
+      Export:
+        Name: lms-authorizer-arn-${sls:stage}
+
+    ValidatorUsuariosArn:
+      Value: !GetAtt ValidatorUsuariosLambdaFunction.Arn
+      Export:
+        Name: lms-validator-usuarios-arn-${sls:stage}
