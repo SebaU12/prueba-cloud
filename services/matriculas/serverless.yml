@@ -83,6 +83,7 @@ stepFunctions:
     enrollmentMachine:
       name: lms-enrollment-${sls:stage}
       type: EXPRESS
+      role: arn:aws:iam::198909467842:role/LabRole
       definition:
         Comment: "Valida y crea una matrícula de forma orquestada"
         StartAt: ValidateStudent
