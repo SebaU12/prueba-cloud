@@ -83,7 +83,6 @@ def handler(event, context):
                 'Put': {
                     'TableName': table.name,
                     'Item':      enrollment_ddb,
-                    'ConditionExpression': 'attribute_not_exists(enrollmentId)',
                 },
             },
             {
