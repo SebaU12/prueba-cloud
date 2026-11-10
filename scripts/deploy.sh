@@ -114,8 +114,66 @@ python bootstrap_tenants.py --stage "$STAGE" --region "$REGION"
 echo "      ✓ tenants inicializados"
 
 # ──────────────────────────────────────────────────────────────────────────────
+# RESUMEN DE RECURSOS
+# ──────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "=================================================="
 echo " Despliegue completado exitosamente"
 echo " Stage: $STAGE | Region: $REGION"
+echo "=================================================="
+
+echo ""
+echo "── S3 ───────────────────────────────────────────"
+echo "  Bucket materiales: $(get_output "lms-infrastructure-$STAGE" "S3BucketName")"
+
+echo ""
+echo "── SNS / SQS ────────────────────────────────────"
+echo "  SNS Topic ARN:     $(get_output "lms-infrastructure-$STAGE" "SnsTopicArn")"
+echo "  SQS Queue URL:     $(get_output "lms-infrastructure-$STAGE" "SqsQueueUrl")"
+echo "  SQS DLQ ARN:       $(get_output "lms-infrastructure-$STAGE" "SqsDlqArn")"
+
+echo ""
+echo "── DynamoDB ─────────────────────────────────────"
+echo "  lms-users-$STAGE"
+echo "  lms-courses-$STAGE"
+echo "  lms-enrollments-$STAGE"
+echo "  lms-contents-$STAGE"
+echo "  lms-evaluations-$STAGE"
+
+echo ""
+echo "── Step Functions ───────────────────────────────"
+echo "  State Machine:     arn:aws:states:$REGION:$(aws sts get-caller-identity --query Account --output text):stateMachine:lms-enrollment-$STAGE"
+
+echo ""
+echo "── Lambda Authorizer ────────────────────────────"
+echo "  ARN: $AUTHORIZER_LAMBDA_ARN"
+
+echo ""
+echo "── API Endpoints ────────────────────────────────"
+echo "  Usuarios:"
+aws cloudformation describe-stacks --stack-name "lms-usuarios-$STAGE" --region "$REGION" \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" --output text \
+  | sed 's/^/    /'
+
+echo "  Cursos:"
+aws cloudformation describe-stacks --stack-name "lms-cursos-$STAGE" --region "$REGION" \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" --output text \
+  | sed 's/^/    /'
+
+echo "  Matriculas:"
+aws cloudformation describe-stacks --stack-name "lms-matriculas-$STAGE" --region "$REGION" \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" --output text \
+  | sed 's/^/    /'
+
+echo "  Contenidos:"
+aws cloudformation describe-stacks --stack-name "lms-contenidos-$STAGE" --region "$REGION" \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" --output text \
+  | sed 's/^/    /'
+
+echo "  Evaluaciones:"
+aws cloudformation describe-stacks --stack-name "lms-evaluaciones-$STAGE" --region "$REGION" \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" --output text \
+  | sed 's/^/    /'
+
+echo ""
 echo "=================================================="
