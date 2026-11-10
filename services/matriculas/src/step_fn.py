@@ -63,14 +63,27 @@ def handler(event, context):
         'ttl':          ttl_outbox,
     }
 
+    enrollment_ddb = {
+        'pk':           {'S': f'TENANT#{tenant_id}#COURSE#{course_id}'},
+        'sk':           {'S': f'STUDENT#{student_id}'},
+        'entityType':   {'S': 'ENROLLMENT'},
+        'enrollmentId': {'S': enrollment_id},
+        'tenantId':     {'S': tenant_id},
+        'courseId':     {'S': course_id},
+        'studentId':    {'S': student_id},
+        'status':       {'S': 'active'},
+        'createdAt':    {'S': now},
+        'GSI1PK':       {'S': f'TENANT#{tenant_id}#STUDENT#{student_id}'},
+        'GSI1SK':       {'S': f'COURSE#{course_id}'},
+    }
+
     try:
         _ddb_cli.transact_write_items(TransactItems=[
             {
                 'Put': {
                     'TableName': table.name,
-                    'Item':      _ddb(enrollment_item),
-                    'ConditionExpression': 'attribute_not_exists(#pk)',
-                    'ExpressionAttributeNames': {'#pk': 'pk'},
+                    'Item':      enrollment_ddb,
+                    'ConditionExpression': 'attribute_not_exists(enrollmentId)',
                 },
             },
             {
