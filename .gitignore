@@ -34,3 +34,4 @@ Thumbs.db
 
 # Scripts con URLs hardcodeadas por despliegue
 scripts/test_endpoints.py
+scripts/test_sns_enrollment.py

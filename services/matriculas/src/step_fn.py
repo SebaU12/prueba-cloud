@@ -81,7 +81,8 @@ def handler(event, context):
         ])
     except ClientError as e:
         if e.response['Error']['Code'] == 'TransactionCanceledException':
-            log.warning(json.dumps({'action': 'enrollment_duplicate', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id}))
+            reasons = [r.get('Code', 'Unknown') for r in e.response.get('CancellationReasons', [])]
+            log.warning(json.dumps({'action': 'enrollment_duplicate', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id, 'cancellationReasons': reasons}))
             raise EnrollmentDuplicate(
                 f'Student {student_id} is already enrolled in course {course_id}'
             )
