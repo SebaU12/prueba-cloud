@@ -67,6 +67,11 @@ def login(event, context):
     email    = (body.get('email') or '').strip().lower()
     password = body.get('password', '')
 
+    # DEBUG temporal — ver en CloudWatch
+    print(f"DEBUG body type: {type(body)}")
+    print(f"DEBUG email: {repr(email)}")
+    print(f"DEBUG password len: {len(password)}, repr: {repr(password)}")
+
     if not email or not password:
         return _error('INVALID_BODY', 'email and password are required')
 
