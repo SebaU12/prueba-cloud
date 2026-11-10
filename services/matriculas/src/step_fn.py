@@ -8,10 +8,10 @@ import uuid
 from boto3.dynamodb.types import TypeSerializer as _TS
 from botocore.exceptions import ClientError
 
-dynamodb = boto3.resource('dynamodb')
-table    = dynamodb.Table(os.environ['TABLE_NAME'])
-_ddb_cli = dynamodb.meta.client
-_ser     = _TS()
+dynamodb  = boto3.resource('dynamodb')
+table     = dynamodb.Table(os.environ['TABLE_NAME'])
+_ddb_cli  = boto3.client('dynamodb')
+_ser      = _TS()
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
