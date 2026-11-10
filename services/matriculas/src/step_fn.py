@@ -26,24 +26,12 @@ def handler(event, context):
     course_id  = event['courseId']
     student_id = event['studentId']
 
+    log.info(json.dumps({'action': 'step_fn_input', 'tenantId': str(tenant_id), 'courseId': str(course_id), 'studentId': str(student_id), 'tenantIdType': type(tenant_id).__name__}))
+
     enrollment_id = f'ENR-{uuid.uuid4()}'
     event_id      = str(uuid.uuid4())
     now           = _now_iso()
     ttl_outbox    = int(time.time()) + 7 * 24 * 3600
-
-    enrollment_item = {
-        'pk':           f'TENANT#{tenant_id}#COURSE#{course_id}',
-        'sk':           f'STUDENT#{student_id}',
-        'entityType':   'ENROLLMENT',
-        'enrollmentId': enrollment_id,
-        'tenantId':     tenant_id,
-        'courseId':     course_id,
-        'studentId':    student_id,
-        'status':       'active',
-        'createdAt':    now,
-        'GSI1PK':       f'TENANT#{tenant_id}#STUDENT#{student_id}',
-        'GSI1SK':       f'COURSE#{course_id}',
-    }
 
     outbox_item = {
         'pk':           'OUTBOX#PENDING',
@@ -102,7 +90,8 @@ def handler(event, context):
                 raise EnrollmentDuplicate(
                     f'Student {student_id} is already enrolled in course {course_id}'
                 )
-            log.error(json.dumps({'action': 'enrollment_transaction_cancelled', 'studentId': student_id, 'courseId': course_id, 'cancellationReasons': codes}))
+            full_reasons = [{'Code': r.get('Code'), 'Message': r.get('Message')} for r in reasons]
+            log.error(json.dumps({'action': 'enrollment_transaction_cancelled', 'studentId': student_id, 'courseId': course_id, 'tenantId': str(tenant_id), 'cancellationReasons': full_reasons}))
         else:
             log.error(json.dumps({'action': 'enrollment_transaction_error', 'studentId': student_id, 'courseId': course_id, 'error': str(e)}))
         raise
