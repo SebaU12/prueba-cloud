@@ -2,6 +2,7 @@ import base64
 import boto3
 import decimal
 import json
+import logging
 import os
 import time
 import uuid
@@ -13,8 +14,11 @@ table    = dynamodb.Table(os.environ['TABLE_NAME'])
 
 VALID_STATUSES = ('draft', 'published', 'closed')
 
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
-# ─── Helpers de evento ────────────────────────────────────────────────────────
+
+# Helpers de evento
 
 def _body(event):
     b = event.get('body') or '{}'
@@ -30,7 +34,7 @@ def _auth(event):
     return event.get('requestContext', {}).get('authorizer', {}) or {}
 
 
-# ─── Helpers de respuesta ─────────────────────────────────────────────────────
+# Helpers de respuesta
 
 _CORS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
 
@@ -55,13 +59,12 @@ def _error(code, message):
     }
 
 
-# ─── Helpers internos ─────────────────────────────────────────────────────────
+# Helpers internos
 
 def _now_iso():
     return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
 def _public_eval(item, role):
-    """Elimina correctIndex para estudiantes."""
     result = {k: v for k, v in item.items() if k not in ('pk', 'sk', 'GSI1PK', 'GSI1SK')}
     if role == 'student' and 'questions' in result:
         result['questions'] = [
@@ -104,7 +107,7 @@ def _is_enrolled(tenant_id, course_id, student_id):
     return item is not None and item.get('status') == 'active'
 
 
-# ─── Handlers ─────────────────────────────────────────────────────────────────
+# Handlers
 
 def create_evaluation(event, context):
     auth      = _auth(event)
@@ -148,6 +151,8 @@ def create_evaluation(event, context):
 
     table.put_item(Item=item)
 
+    log.info(json.dumps({'action': 'create_evaluation_ok', 'evaluationId': eval_id, 'courseId': course_id, 'teacherId': user_id, 'tenantId': tenant_id}))
+
     return _ok(_public_eval(item, role))
 
 
@@ -163,10 +168,11 @@ def update_evaluation(event, context):
         return _error('NOT_FOUND', 'Evaluation not found')
 
     if role == 'teacher' and item.get('teacherId') != user_id:
+        log.warning(json.dumps({'action': 'update_evaluation_forbidden', 'evaluationId': eval_id, 'userId': user_id, 'tenantId': tenant_id}))
         return _error('FORBIDDEN', 'Teachers can only update their own evaluations')
 
-    body      = _body(event)
-    updates   = []
+    body       = _body(event)
+    updates    = []
     attr_names = {}
     attr_vals  = {}
 
@@ -188,7 +194,6 @@ def update_evaluation(event, context):
         if new_status not in VALID_STATUSES:
             return _error('INVALID_BODY', f'status must be one of {VALID_STATUSES}')
 
-        # Validar preguntas antes de publicar
         if new_status == 'published':
             questions = body.get('questions', item.get('questions', []))
             error_msg = _validate_questions(questions)
@@ -216,6 +221,8 @@ def update_evaluation(event, context):
 
     result = table.update_item(**kwargs)
 
+    log.info(json.dumps({'action': 'update_evaluation_ok', 'evaluationId': eval_id, 'userId': user_id, 'tenantId': tenant_id}))
+
     return _ok(_public_eval(result['Attributes'], role))
 
 
@@ -235,9 +242,8 @@ def list_evaluations(event, context):
         ),
     }
 
-    # Estudiantes solo ven evaluaciones publicadas
     if role == 'student':
-        kwargs['FilterExpression']        = '#status = :published'
+        kwargs['FilterExpression']         = '#status = :published'
         kwargs['ExpressionAttributeNames'] = {'#status': 'status'}
         kwargs['ExpressionAttributeValues'] = {':published': 'published'}
 
@@ -258,11 +264,11 @@ def get_evaluation(event, context):
     if not item:
         return _error('NOT_FOUND', 'Evaluation not found')
 
-    # Estudiante: solo puede ver publicadas y si está matriculado
     if role == 'student':
         if item.get('status') != 'published':
             return _error('NOT_FOUND', 'Evaluation not found')
         if not _is_enrolled(tenant_id, item['courseId'], user_id):
+            log.warning(json.dumps({'action': 'get_evaluation_not_enrolled', 'evaluationId': eval_id, 'userId': user_id, 'tenantId': tenant_id}))
             return _error('FORBIDDEN', 'You are not enrolled in this course')
 
     return _ok(_public_eval(item, role))

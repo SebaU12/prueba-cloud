@@ -21,7 +21,7 @@ plugins:
 
 functions:
 
-  # ─── HTTP handler: inicia Step Functions Express (síncrono) ──────────────────
+  # HTTP handler — inicia Step Functions Express (síncrono)
   createEnrollment:
     handler: src/handlers.create_enrollment
     events:
@@ -50,11 +50,11 @@ functions:
             identitySource: method.request.header.Authorization
             type: request
 
-  # ─── Invocado por Step Functions (sin HTTP event) ────────────────────────────
+  # Invocado por Step Functions, sin HTTP event
   enrollmentStepFn:
     handler: src/step_fn.handler
 
-  # ─── DynamoDB Streams → SNS (patrón Outbox) ──────────────────────────────────
+  # DynamoDB Streams → SNS (patrón Outbox)
   publishOutbox:
     handler: src/outbox.publish
     events:
@@ -69,7 +69,7 @@ functions:
                   entityType:
                     S: [OUTBOX]
 
-  # ─── SQS consumer (idempotente) ──────────────────────────────────────────────
+  # SQS consumer (idempotente)
   consumeEnrollment:
     handler: src/consumer.handler
     events:

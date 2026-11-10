@@ -4,6 +4,7 @@ import decimal
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import time
@@ -14,8 +15,11 @@ from boto3.dynamodb.conditions import Key
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
-# ─── Helpers de evento ────────────────────────────────────────────────────────
+
+# Helpers de evento
 
 def _body(event):
     b = event.get('body') or '{}'
@@ -31,7 +35,7 @@ def _auth(event):
     return event.get('requestContext', {}).get('authorizer', {}) or {}
 
 
-# ─── Helpers de respuesta ─────────────────────────────────────────────────────
+# Helpers de respuesta
 
 _CORS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
 
@@ -56,7 +60,7 @@ def _error(code, message):
     }
 
 
-# ─── Helpers internos ─────────────────────────────────────────────────────────
+# Helpers internos
 
 def _now_iso():
     return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -73,12 +77,11 @@ def _verify_password(password, hash_b64, salt_b64, iterations=310_000):
     return hmac.compare_digest(computed, stored)
 
 def _safe_user(item):
-    """Devuelve el usuario sin campos sensibles."""
     return {k: v for k, v in item.items()
             if k not in ('passwordHashB64', 'passwordSaltB64', 'passwordIterations', 'failedAttempts')}
 
 
-# ─── Handlers ─────────────────────────────────────────────────────────────────
+# Handlers
 
 def login(event, context):
     body     = _body(event)
@@ -88,41 +91,45 @@ def login(event, context):
     if not email or not password:
         return _error('INVALID_BODY', 'email and password are required')
 
-    # 1. Lookup por email
+    # Lookup por email
     lookup = table.get_item(
         Key={'pk': f'EMAIL#{email}', 'sk': 'LOOKUP'},
         ConsistentRead=True,
     ).get('Item')
 
     if not lookup:
+        log.warning(json.dumps({'action': 'login_failed', 'email': email, 'reason': 'email_not_found'}))
         return _error('INVALID_CREDENTIALS', 'Invalid email or password')
 
     tenant_id = lookup['tenantId']
     user_id   = lookup['userId']
 
-    # 2. Obtener usuario
+    # Obtener usuario
     user = table.get_item(
         Key={'pk': f'TENANT#{tenant_id}', 'sk': f'USER#{user_id}'},
         ConsistentRead=True,
     ).get('Item')
 
     if not user or user.get('status') != 'active':
+        log.warning(json.dumps({'action': 'login_failed', 'email': email, 'reason': 'user_inactive_or_missing'}))
         return _error('INVALID_CREDENTIALS', 'Invalid email or password')
 
-    # 3. Verificar bloqueo por intentos fallidos
+    # Verificar bloqueo por intentos fallidos
     if int(user.get('failedAttempts', 0)) >= 5:
+        log.warning(json.dumps({'action': 'login_blocked', 'userId': user_id, 'tenantId': tenant_id}))
         return _error('TOO_MANY_ATTEMPTS', 'Account temporarily locked')
 
-    # 4. Verificar contraseña
+    # Verificar contraseña
     if not _verify_password(password, user['passwordHashB64'], user['passwordSaltB64'], user.get('passwordIterations', 310_000)):
         table.update_item(
             Key={'pk': f'TENANT#{tenant_id}', 'sk': f'USER#{user_id}'},
             UpdateExpression='SET failedAttempts = failedAttempts + :one',
             ExpressionAttributeValues={':one': 1},
         )
+        log.warning(json.dumps({'action': 'login_failed', 'userId': user_id, 'tenantId': tenant_id, 'reason': 'wrong_password'}))
         return _error('INVALID_CREDENTIALS', 'Invalid email or password')
 
-    # 5. Crear sesión
+    # Crear sesión
     token      = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     ttl        = int(time.time()) + 8 * 3600
@@ -143,6 +150,8 @@ def login(event, context):
         'ttl':        ttl,
     })
 
+    log.info(json.dumps({'action': 'login_ok', 'userId': user_id, 'tenantId': tenant_id, 'role': user['role']}))
+
     return _ok({
         'accessToken': token,
         'tokenType':   'Bearer',
@@ -161,13 +170,14 @@ def logout(event, context):
     user_id    = auth.get('userId')
     tenant_id  = auth.get('tenantId')
 
-    # Recuperar el token del header para eliminarlo
     headers    = event.get('headers') or {}
     auth_header = headers.get('Authorization') or headers.get('authorization', '')
     token      = auth_header[len('Bearer '):]
     token_hash = hashlib.sha256(token.encode()).hexdigest()
 
     table.delete_item(Key={'pk': f'SESSION#{token_hash}', 'sk': 'META'})
+
+    log.info(json.dumps({'action': 'logout', 'userId': user_id, 'tenantId': tenant_id}))
 
     return _ok({})
 
@@ -182,6 +192,7 @@ def get_me(event, context):
     ).get('Item')
 
     if not item:
+        log.error(json.dumps({'action': 'get_me_failed', 'userId': user_id, 'tenantId': tenant_id}))
         return _error('NOT_FOUND', 'User not found')
 
     return _ok(_safe_user(item))
@@ -206,13 +217,13 @@ def create_user(event, context):
     if new_role not in ('student', 'teacher', 'tenant_admin'):
         return _error('INVALID_BODY', 'Invalid role')
 
-    # Verificar si el email ya existe en el tenant
     existing = table.get_item(
         Key={'pk': f'EMAIL#{email}', 'sk': 'LOOKUP'},
         ConsistentRead=True,
     ).get('Item')
 
     if existing:
+        log.warning(json.dumps({'action': 'create_user_conflict', 'email': email, 'tenantId': tenant_id}))
         return _error('CONFLICT', 'Email already exists')
 
     tenant_letter = tenant_id.split('_')[-1]
@@ -241,6 +252,8 @@ def create_user(event, context):
         'userId':   user_id,
         'tenantId': tenant_id,
     })
+
+    log.info(json.dumps({'action': 'create_user_ok', 'userId': user_id, 'email': email, 'role': new_role, 'tenantId': tenant_id}))
 
     return _ok({'userId': user_id, 'email': email, 'role': new_role})
 

@@ -22,7 +22,7 @@ def handler(event, context):
         return _deny(event.get('methodArn', '*'))
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# Helpers
 
 def _extract_token(event):
     headers = event.get('headers') or {}

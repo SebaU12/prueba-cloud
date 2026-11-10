@@ -16,11 +16,11 @@ provider:
 
 functions:
 
-  # ─── Validator (invocado por Step Functions de Matrículas, sin HTTP event) ───
+  # Validator — invocado por Step Functions de Matrículas, sin HTTP event
   validatorCursos:
     handler: src/validators.handler
 
-  # ─── Endpoints privados ───────────────────────────────────────────────────────
+  # Endpoints privados
   createCourse:
     handler: src/handlers.create_course
     events:

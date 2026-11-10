@@ -58,7 +58,7 @@ def handler(event, context):
     }
 
 
-# ─── Excepciones nombradas (Step Functions las captura por nombre) ─────────────
+# Excepciones nombradas — Step Functions las captura por nombre
 
 class ValidationError(Exception):
     pass

@@ -13,7 +13,7 @@ _ctx = ssl.create_default_context()
 _ctx.check_hostname = False
 _ctx.verify_mode = ssl.CERT_NONE
 
-# ─── Configuración ────────────────────────────────────────────────────────────
+# Configuración
 
 BASE_U  = "https://bqr9yndpkh.execute-api.us-east-1.amazonaws.com/dev"
 BASE_C  = "https://290ukd638e.execute-api.us-east-1.amazonaws.com/dev"
@@ -34,7 +34,7 @@ STUDENT_PASS   = "Seed2026!"
 STUDENT2_EMAIL = "student00202@tenant-a.edu"
 STUDENT2_PASS  = "Seed2026!"
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# Helpers
 
 PASS = "\033[92m✓\033[0m"
 FAIL = "\033[91m✗\033[0m"
@@ -47,7 +47,7 @@ def req(method, url, body=None, token=None, raw_body=None, extra_headers=None):
         headers = {}
     else:
         data = json.dumps(body).encode() if body else None
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json"} if body else {}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     if extra_headers:
@@ -83,13 +83,13 @@ def check(name, status, body, expect_status=200, expect_key=None, expect_no_key=
     return body
 
 
-# ─── Tests ────────────────────────────────────────────────────────────────────
+# Tests
 
 print("\n══════════════════════════════════════════════════════════")
 print("  LMS Grupo 3 — Test integral de endpoints")
 print("══════════════════════════════════════════════════════════\n")
 
-# ── 1. USUARIOS ───────────────────────────────────────────────────────────────
+# 1. Usuarios
 print("── 1. Usuarios ──────────────────────────────────────────")
 
 s, b = req("POST", f"{BASE_U}/v1/auth/login",
@@ -167,7 +167,7 @@ s, b = req("POST", f"{BASE_U}/v1/auth/login",
 admin_b_token   = b.get("data", {}).get("accessToken", "")
 admin_b_user_id = b.get("data", {}).get("user", {}).get("userId", "")
 
-# ── 2. CURSOS ─────────────────────────────────────────────────────────────────
+# 2. Cursos
 print("\n── 2. Cursos ────────────────────────────────────────────")
 
 s, b = req("POST", f"{BASE_C}/v1/courses",
@@ -207,7 +207,7 @@ if admin_b_token and course_id:
     s, b = req("GET", f"{BASE_C}/v1/courses/{course_id}", token=admin_b_token)
     check("GET  /v1/courses/{courseId} (TENANT_B) → NOT_FOUND", s, b, 200, "NOT_FOUND")
 
-# ── 3. MATRÍCULAS ─────────────────────────────────────────────────────────────
+# 3. Matrículas
 print("\n── 3. Matrículas ────────────────────────────────────────")
 
 s, b = req("GET", f"{BASE_C}/v1/courses", token=student_token)
@@ -242,7 +242,7 @@ if student2_token and student_user_id:
     s, b = req("GET", f"{BASE_M}/v1/enrollments?studentId={student_user_id}", token=student2_token)
     check("GET  /v1/enrollments (otro student) → FORBIDDEN", s, b, 200, "FORBIDDEN")
 
-# ── 4. CONTENIDOS ─────────────────────────────────────────────────────────────
+# 4. Contenidos
 print("\n── 4. Contenidos ────────────────────────────────────────")
 
 content_id  = ""
@@ -281,6 +281,14 @@ if published_course_id:
                 s, b = req("GET", f"{BASE_CO}/v1/materials/{content_id}/download-url",
                            token=student_token)
                 check("GET  /v1/materials/{id}/download-url (enrolled)", s, b, 200, "downloadUrl")
+                download_url = b.get("data", {}).get("downloadUrl", "")
+
+                # Descarga real desde S3 con la presigned URL (sin headers extra)
+                if download_url:
+                    s_s3, _ = req("GET", download_url)
+                    downloaded = s_s3 in (200, 206)
+                    print(f"  {'✓' if downloaded else '✗'}  GET presigned URL (download S3)                            status={s_s3}")
+                    results.append(downloaded)
 
                 # Download URL como student NO matriculado → FORBIDDEN
                 if student2_token:
@@ -293,7 +301,7 @@ if published_course_id:
                    token=student_token)
         check("GET  /v1/materials?courseId=...", s, b, 200, "items")
 
-# ── 5. EVALUACIONES ───────────────────────────────────────────────────────────
+# 5. Evaluaciones
 print("\n── 5. Evaluaciones ──────────────────────────────────────")
 
 if published_course_id:
@@ -334,7 +342,7 @@ if published_course_id:
     s, b = req("GET", f"{BASE_E}/v1/evaluations?courseId={published_course_id}", token=student_token)
     check("GET  /v1/evaluations", s, b, 200, "items")
 
-# ─── Resumen ──────────────────────────────────────────────────────────────────
+# Resumen
 total  = len(results)
 passed = sum(results)
 failed = total - passed

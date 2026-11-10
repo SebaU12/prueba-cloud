@@ -2,6 +2,7 @@ import base64
 import boto3
 import decimal
 import json
+import logging
 import os
 import uuid
 
@@ -13,8 +14,11 @@ sfn      = boto3.client('stepfunctions')
 
 STATE_MACHINE_ARN = os.environ['STATE_MACHINE_ARN']
 
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
-# ─── Helpers de evento ────────────────────────────────────────────────────────
+
+# Helpers de evento
 
 def _body(event):
     b = event.get('body') or '{}'
@@ -27,7 +31,7 @@ def _auth(event):
     return event.get('requestContext', {}).get('authorizer', {}) or {}
 
 
-# ─── Helpers de respuesta ─────────────────────────────────────────────────────
+# Helpers de respuesta
 
 _CORS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
 
@@ -52,7 +56,7 @@ def _error(code, message):
     }
 
 
-# ─── Handlers ─────────────────────────────────────────────────────────────────
+# Handlers
 
 def create_enrollment(event, context):
     auth      = _auth(event)
@@ -66,7 +70,6 @@ def create_enrollment(event, context):
     if not course_id:
         return _error('INVALID_BODY', 'courseId is required')
 
-    # El student solo puede matricularse a sí mismo
     if role == 'student':
         student_id = user_id
     elif role == 'tenant_admin':
@@ -76,7 +79,8 @@ def create_enrollment(event, context):
     else:
         return _error('FORBIDDEN', 'Only students and admins can create enrollments')
 
-    # Iniciar Step Functions Express (síncrono — espera el resultado)
+    log.info(json.dumps({'action': 'enrollment_start', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id}))
+
     sfn_input = json.dumps({
         'tenantId':  tenant_id,
         'courseId':  course_id,
@@ -89,22 +93,25 @@ def create_enrollment(event, context):
             input=sfn_input,
         )
     except Exception as e:
+        log.error(json.dumps({'action': 'enrollment_sfn_error', 'studentId': student_id, 'courseId': course_id, 'error': str(e)}))
         return _error('INTERNAL_ERROR', str(e))
 
     if response['status'] == 'SUCCEEDED':
         output = json.loads(response['output'])
+        log.info(json.dumps({'action': 'enrollment_ok', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id}))
         return _ok(output.get('enrollment', output))
 
-    # Mapear errores de Step Functions a respuestas HTTP
     error = response.get('error', 'UNKNOWN_ERROR')
     cause = response.get('cause', 'An error occurred')
 
+    log.warning(json.dumps({'action': 'enrollment_failed', 'studentId': student_id, 'courseId': course_id, 'sfnError': error}))
+
     error_map = {
-        'StudentNotFound':    ('NOT_FOUND',  'Student not found or inactive'),
-        'StudentInactive':    ('NOT_FOUND',  'Student not found or inactive'),
-        'TenantMismatch':     ('NOT_FOUND',  'Resource not found'),
-        'CourseNotFound':     ('NOT_FOUND',  'Course not found or not published'),
-        'CourseNotPublished': ('NOT_FOUND',  'Course not found or not published'),
+        'StudentNotFound':     ('NOT_FOUND', 'Student not found or inactive'),
+        'StudentInactive':     ('NOT_FOUND', 'Student not found or inactive'),
+        'TenantMismatch':      ('NOT_FOUND', 'Resource not found'),
+        'CourseNotFound':      ('NOT_FOUND', 'Course not found or not published'),
+        'CourseNotPublished':  ('NOT_FOUND', 'Course not found or not published'),
         'EnrollmentDuplicate': ('CONFLICT',  'Student is already enrolled in this course'),
     }
 
@@ -118,16 +125,15 @@ def list_enrollments(event, context):
     user_id   = auth.get('userId')
     role      = auth.get('role')
 
-    query     = _query(event)
-    course_id = query.get('courseId')
+    query      = _query(event)
+    course_id  = query.get('courseId')
     student_id = query.get('studentId')
-    limit     = min(int(query.get('limit', 20)), 100)
-    cursor    = query.get('nextToken')
+    limit      = min(int(query.get('limit', 20)), 100)
+    cursor     = query.get('nextToken')
 
     if not course_id and not student_id:
         return _error('INVALID_BODY', 'courseId or studentId query param is required')
 
-    # Verificar permisos
     if student_id and role == 'student' and student_id != user_id:
         return _error('FORBIDDEN', 'Students can only list their own enrollments')
 
@@ -149,8 +155,8 @@ def list_enrollments(event, context):
         )
         result = table.query(**kwargs)
 
-    items    = [_public_enrollment(i) for i in result.get('Items', [])]
-    last_key = result.get('LastEvaluatedKey')
+    items      = [_public_enrollment(i) for i in result.get('Items', [])]
+    last_key   = result.get('LastEvaluatedKey')
     next_token = base64.b64encode(json.dumps(last_key).encode()).decode() if last_key else None
 
     return _ok({'items': items, 'nextToken': next_token})

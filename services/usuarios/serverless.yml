@@ -15,15 +15,15 @@ provider:
 
 functions:
 
-  # ─── Authorizer (invocado por API Gateway, sin HTTP event) ───────────────────
+  # Authorizer — invocado por API Gateway, sin HTTP event
   authorizer:
     handler: src/authorizer.handler
 
-  # ─── Validator (invocado por Step Functions de Matrículas, sin HTTP event) ───
+  # Validator — invocado por Step Functions de Matrículas, sin HTTP event
   validatorUsuarios:
     handler: src/validators.handler
 
-  # ─── Endpoints públicos ───────────────────────────────────────────────────────
+  # Endpoints públicos
   login:
     handler: src/handlers.login
     events:
@@ -33,7 +33,7 @@ functions:
           cors: true
 
 
-  # ─── Endpoints privados ───────────────────────────────────────────────────────
+  # Endpoints privados
   logout:
     handler: src/handlers.logout
     events:

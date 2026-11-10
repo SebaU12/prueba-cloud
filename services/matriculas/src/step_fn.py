@@ -1,4 +1,6 @@
 import boto3
+import json
+import logging
 import os
 import time
 import uuid
@@ -11,35 +13,15 @@ table    = dynamodb.Table(os.environ['TABLE_NAME'])
 _ddb_cli = dynamodb.meta.client
 _ser     = _TS()
 
+log = logging.getLogger()
+log.setLevel(logging.INFO)
+
+
 def _ddb(item):
-    """Convierte un dict Python al formato nativo de DynamoDB."""
     return {k: _ser.serialize(v) for k, v in item.items()}
 
 
 def handler(event, context):
-    """
-    Invocado por Step Functions — estado CreateEnrollmentRecord.
-
-    Input esperado (acumulado por Step Functions):
-    {
-        "tenantId":          "TENANT_A",
-        "courseId":          "CRS-A-00001",
-        "studentId":         "USR-A-00101",
-        "studentValidation": { ... },   <- resultado de ValidateStudent
-        "courseValidation":  { ... }    <- resultado de ValidateCourse
-    }
-
-    Output en éxito:
-    {
-        "enrollmentId": "ENR-uuid",
-        "courseId":     "CRS-A-00001",
-        "studentId":    "USR-A-00101",
-        "status":       "active",
-        "createdAt":    "..."
-    }
-
-    Lanza EnrollmentDuplicate si ya existe la matrícula.
-    """
     tenant_id  = event['tenantId']
     course_id  = event['courseId']
     student_id = event['studentId']
@@ -47,7 +29,7 @@ def handler(event, context):
     enrollment_id = f'ENR-{uuid.uuid4()}'
     event_id      = str(uuid.uuid4())
     now           = _now_iso()
-    ttl_outbox    = int(time.time()) + 7 * 24 * 3600  # 7 días
+    ttl_outbox    = int(time.time()) + 7 * 24 * 3600
 
     enrollment_item = {
         'pk':           f'TENANT#{tenant_id}#COURSE#{course_id}',
@@ -99,10 +81,14 @@ def handler(event, context):
         ])
     except ClientError as e:
         if e.response['Error']['Code'] == 'TransactionCanceledException':
+            log.warning(json.dumps({'action': 'enrollment_duplicate', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id}))
             raise EnrollmentDuplicate(
                 f'Student {student_id} is already enrolled in course {course_id}'
             )
+        log.error(json.dumps({'action': 'enrollment_transaction_error', 'studentId': student_id, 'courseId': course_id, 'error': str(e)}))
         raise
+
+    log.info(json.dumps({'action': 'enrollment_created', 'enrollmentId': enrollment_id, 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id}))
 
     return {
         'enrollmentId': enrollment_id,
@@ -116,8 +102,6 @@ def handler(event, context):
 def _now_iso():
     return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
-
-# ─── Excepción nombrada (Step Functions la captura con Catch) ──────────────────
 
 class EnrollmentDuplicate(Exception):
     pass

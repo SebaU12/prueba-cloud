@@ -12,7 +12,7 @@ provider:
 resources:
   Resources:
 
-    # ─── S3 ───────────────────────────────────────────────────────────────────
+    # S3
     LmsMaterialesBucket:
       Type: AWS::S3::Bucket
       Properties:
@@ -36,20 +36,20 @@ resources:
                 - "*"
               MaxAge: 300
 
-    # ─── SNS ──────────────────────────────────────────────────────────────────
+    # SNS
     EnrollmentTopic:
       Type: AWS::SNS::Topic
       Properties:
         TopicName: lms-enrollment-created-${sls:stage}
 
-    # ─── SQS DLQ ──────────────────────────────────────────────────────────────
+    # SQS DLQ
     EnrollmentDLQ:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: lms-enrollment-dlq-${sls:stage}
         MessageRetentionPeriod: 1209600  # 14 días
 
-    # ─── SQS Queue ────────────────────────────────────────────────────────────
+    # SQS Queue
     EnrollmentQueue:
       Type: AWS::SQS::Queue
       Properties:
@@ -59,7 +59,15 @@ resources:
           deadLetterTargetArn: !GetAtt EnrollmentDLQ.Arn
           maxReceiveCount: 5
 
-    # ─── SNS → SQS Subscription ───────────────────────────────────────────────
+    # SNS → Email Subscription
+    EnrollmentEmailSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref EnrollmentTopic
+        Protocol: email
+        Endpoint: sebastian.lizarraga@utec.edu.pe
+
+    # SNS → SQS Subscription
     EnrollmentSubscription:
       Type: AWS::SNS::Subscription
       Properties:
@@ -68,7 +76,7 @@ resources:
         Endpoint: !GetAtt EnrollmentQueue.Arn
         RawMessageDelivery: true
 
-    # ─── SQS Policy (permite a SNS enviar mensajes) ───────────────────────────
+    # SQS Policy — permite a SNS enviar mensajes
     EnrollmentQueuePolicy:
       Type: AWS::SQS::QueuePolicy
       Properties:

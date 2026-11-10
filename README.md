@@ -107,6 +107,31 @@ Todos los endpoints privados requieren: `Authorization: Bearer <token>`
 | GET | `/evaluations` | Todos | Listar evaluaciones |
 | GET | `/evaluations/{id}` | Todos (student: sin correctIndex) | Obtener evaluación |
 
+## Notificaciones por email (SNS)
+
+Cuando se crea una matrícula, el sistema publica un evento en SNS. Cualquier email suscrito al topic recibe una notificación.
+
+### Agregar un correo
+
+Editar `infrastructure/serverless.yml` y agregar un nuevo recurso de tipo `AWS::SNS::Subscription`:
+
+```yaml
+NombreSubscription:
+  Type: AWS::SNS::Subscription
+  Properties:
+    TopicArn: !Ref EnrollmentTopic
+    Protocol: email
+    Endpoint: correo@ejemplo.com
+```
+
+Luego redesplegar:
+
+```bash
+cd infrastructure && serverless deploy --stage dev --region us-east-1
+```
+
+AWS enviará un email de confirmación a la dirección indicada. **El suscriptor debe hacer clic en "Confirm subscription"** para empezar a recibir notificaciones. Hasta que no confirme, los mensajes no llegan.
+
 ## Flujo de matrícula
 
 ```

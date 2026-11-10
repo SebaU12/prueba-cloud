@@ -2,6 +2,7 @@ import base64
 import boto3
 import decimal
 import json
+import logging
 import os
 import time
 import uuid
@@ -13,8 +14,11 @@ table = dynamodb.Table(os.environ['TABLE_NAME'])
 
 VALID_STATUSES = ('draft', 'published', 'archived')
 
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
-# ─── Helpers de evento ────────────────────────────────────────────────────────
+
+# Helpers de evento
 
 def _body(event):
     b = event.get('body') or '{}'
@@ -30,7 +34,7 @@ def _auth(event):
     return event.get('requestContext', {}).get('authorizer', {}) or {}
 
 
-# ─── Helpers de respuesta ─────────────────────────────────────────────────────
+# Helpers de respuesta
 
 _CORS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
 
@@ -55,7 +59,7 @@ def _error(code, message):
     }
 
 
-# ─── Helpers internos ─────────────────────────────────────────────────────────
+# Helpers internos
 
 def _now_iso():
     return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -64,7 +68,7 @@ def _public_course(item):
     return {k: v for k, v in item.items() if k not in ('pk', 'sk', 'GSI1PK', 'GSI1SK')}
 
 
-# ─── Handlers ─────────────────────────────────────────────────────────────────
+# Handlers
 
 def create_course(event, context):
     auth      = _auth(event)
@@ -87,21 +91,23 @@ def create_course(event, context):
     now           = _now_iso()
 
     item = {
-        'pk':         f'TENANT#{tenant_id}',
-        'sk':         f'COURSE#{course_id}',
-        'entityType': 'COURSE',
-        'courseId':   course_id,
-        'tenantId':   tenant_id,
-        'teacherId':  user_id,
-        'title':      title,
+        'pk':          f'TENANT#{tenant_id}',
+        'sk':          f'COURSE#{course_id}',
+        'entityType':  'COURSE',
+        'courseId':    course_id,
+        'tenantId':    tenant_id,
+        'teacherId':   user_id,
+        'title':       title,
         'description': desc,
-        'status':     'draft',
-        'createdAt':  now,
-        'GSI1PK':     f'TENANT#{tenant_id}#TEACHER#{user_id}',
-        'GSI1SK':     f'COURSE#{course_id}',
+        'status':      'draft',
+        'createdAt':   now,
+        'GSI1PK':      f'TENANT#{tenant_id}#TEACHER#{user_id}',
+        'GSI1SK':      f'COURSE#{course_id}',
     }
 
     table.put_item(Item=item)
+
+    log.info(json.dumps({'action': 'create_course_ok', 'courseId': course_id, 'teacherId': user_id, 'tenantId': tenant_id}))
 
     return _ok(_public_course(item))
 
@@ -116,7 +122,6 @@ def list_courses(event, context):
     teacher_id = query.get('teacherId')
 
     if teacher_id:
-        # Usar GSI para listar cursos de un docente específico
         kwargs = {
             'IndexName': 'GSI_BY_TEACHER',
             'KeyConditionExpression': Key('GSI1PK').eq(f'TENANT#{tenant_id}#TEACHER#{teacher_id}'),
@@ -169,6 +174,7 @@ def update_course(event, context):
         return _error('NOT_FOUND', 'Course not found')
 
     if role == 'teacher' and item.get('teacherId') != user_id:
+        log.warning(json.dumps({'action': 'update_course_forbidden', 'courseId': course_id, 'userId': user_id, 'tenantId': tenant_id}))
         return _error('FORBIDDEN', 'Teachers can only update their own courses')
 
     body       = _body(event)
@@ -199,14 +205,16 @@ def update_course(event, context):
     attr_vals[':updatedAt'] = _now_iso()
 
     kwargs = {
-        'Key':                     {'pk': f'TENANT#{tenant_id}', 'sk': f'COURSE#{course_id}'},
-        'UpdateExpression':        'SET ' + ', '.join(updates),
+        'Key':                       {'pk': f'TENANT#{tenant_id}', 'sk': f'COURSE#{course_id}'},
+        'UpdateExpression':          'SET ' + ', '.join(updates),
         'ExpressionAttributeValues': attr_vals,
-        'ReturnValues':            'ALL_NEW',
+        'ReturnValues':              'ALL_NEW',
     }
     if attr_names:
         kwargs['ExpressionAttributeNames'] = attr_names
 
     result = table.update_item(**kwargs)
+
+    log.info(json.dumps({'action': 'update_course_ok', 'courseId': course_id, 'userId': user_id, 'tenantId': tenant_id}))
 
     return _ok(_public_course(result['Attributes']))

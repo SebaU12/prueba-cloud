@@ -2,6 +2,7 @@ import base64
 import boto3
 import decimal
 import json
+import logging
 import os
 import time
 import uuid
@@ -23,8 +24,11 @@ ALLOWED_MIME_TYPES = (
     'text/plain',
 )
 
+log = logging.getLogger()
+log.setLevel(logging.INFO)
 
-# ─── Helpers de evento ────────────────────────────────────────────────────────
+
+# Helpers de evento
 
 def _body(event):
     b = event.get('body') or '{}'
@@ -40,7 +44,7 @@ def _auth(event):
     return event.get('requestContext', {}).get('authorizer', {}) or {}
 
 
-# ─── Helpers de respuesta ─────────────────────────────────────────────────────
+# Helpers de respuesta
 
 _CORS = {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
 
@@ -65,7 +69,7 @@ def _error(code, message):
     }
 
 
-# ─── Helpers internos ─────────────────────────────────────────────────────────
+# Helpers internos
 
 def _now_iso():
     return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
@@ -74,7 +78,6 @@ def _public_content(item):
     return {k: v for k, v in item.items() if k not in ('pk', 'sk', 'GSI1PK', 'GSI1SK')}
 
 def _get_content_by_id(tenant_id, content_id):
-    """Lookup por GSI para obtener contenido sin saber el courseId."""
     result = table.query(
         IndexName='GSI_BY_CONTENT',
         KeyConditionExpression=Key('GSI1PK').eq(f'TENANT#{tenant_id}#CONTENT#{content_id}'),
@@ -84,7 +87,6 @@ def _get_content_by_id(tenant_id, content_id):
     return items[0] if items else None
 
 def _is_enrolled(tenant_id, course_id, student_id):
-    """Verifica si el estudiante está matriculado en el curso."""
     enrollments_table_name = os.environ['TABLE_NAME'].replace('contents', 'enrollments')
     enroll_table = dynamodb.Table(enrollments_table_name)
     item = enroll_table.get_item(
@@ -96,7 +98,7 @@ def _is_enrolled(tenant_id, course_id, student_id):
     return item is not None and item.get('status') == 'active'
 
 
-# ─── Handlers ─────────────────────────────────────────────────────────────────
+# Handlers
 
 def create_material(event, context):
     auth      = _auth(event)
@@ -144,13 +146,14 @@ def create_material(event, context):
 
     table.put_item(Item=item)
 
+    log.info(json.dumps({'action': 'create_material_ok', 'contentId': content_id, 'courseId': course_id, 'uploadedBy': user_id, 'tenantId': tenant_id}))
+
     return _ok({'contentId': content_id, 'uploadStatus': 'pending'})
 
 
 def get_upload_url(event, context):
     auth       = _auth(event)
     tenant_id  = auth.get('tenantId')
-    user_id    = auth.get('userId')
     role       = auth.get('role')
     content_id = _path(event).get('contentId')
 
@@ -174,6 +177,8 @@ def get_upload_url(event, context):
         ExpiresIn=300,
     )
 
+    log.info(json.dumps({'action': 'upload_url_generated', 'contentId': content_id, 'tenantId': tenant_id}))
+
     return _ok({'uploadUrl': upload_url, 'expiresIn': 300})
 
 
@@ -186,10 +191,10 @@ def confirm_upload(event, context):
     if not item:
         return _error('NOT_FOUND', 'Content not found')
 
-    # Verificar que el objeto existe en S3
     try:
         s3.head_object(Bucket=S3_BUCKET, Key=item['s3Key'])
     except s3.exceptions.ClientError:
+        log.warning(json.dumps({'action': 'confirm_upload_no_file', 'contentId': content_id, 's3Key': item['s3Key']}))
         return _error('BAD_REQUEST', 'File not found in S3, complete the upload first')
 
     table.update_item(
@@ -200,6 +205,8 @@ def confirm_upload(event, context):
             ':now':       _now_iso(),
         },
     )
+
+    log.info(json.dumps({'action': 'upload_confirmed', 'contentId': content_id, 'tenantId': tenant_id}))
 
     return _ok({'contentId': content_id, 'uploadStatus': 'confirmed'})
 
@@ -239,9 +246,9 @@ def get_download_url(event, context):
     if item.get('uploadStatus') != 'confirmed':
         return _error('NOT_FOUND', 'Content not found')
 
-    # Verificar acceso: student debe estar matriculado
     if role == 'student':
         if not _is_enrolled(tenant_id, item['courseId'], user_id):
+            log.warning(json.dumps({'action': 'download_forbidden', 'contentId': content_id, 'userId': user_id, 'tenantId': tenant_id}))
             return _error('FORBIDDEN', 'You are not enrolled in this course')
 
     download_url = s3.generate_presigned_url(
@@ -252,5 +259,7 @@ def get_download_url(event, context):
         },
         ExpiresIn=60,
     )
+
+    log.info(json.dumps({'action': 'download_url_generated', 'contentId': content_id, 'userId': user_id, 'tenantId': tenant_id}))
 
     return _ok({'downloadUrl': download_url, 'expiresIn': 60})

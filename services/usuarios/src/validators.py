@@ -1,32 +1,18 @@
 import boto3
+import json
+import logging
 import os
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE_NAME'])
 
+log = logging.getLogger()
+log.setLevel(logging.INFO)
+
 
 def handler(event, context):
-    """
-    Invocado por Step Functions de Matrículas.
-
-    Input esperado:
-    {
-        "tenantId": "TENANT_A",
-        "userId":   "USR-A-00001"
-    }
-
-    Output en éxito:
-    {
-        "userId":   "USR-A-00001",
-        "tenantId": "TENANT_A",
-        "role":     "student",
-        "status":   "active"
-    }
-
-    Lanza excepción nombrada si falla — Step Functions la captura con Catch.
-    """
-    tenant_id  = event.get('tenantId')
-    user_id    = event.get('studentId') or event.get('userId')
+    tenant_id = event.get('tenantId')
+    user_id   = event.get('studentId') or event.get('userId')
 
     if not tenant_id or not user_id:
         raise ValidationError('Missing tenantId or studentId')
@@ -42,16 +28,22 @@ def handler(event, context):
     item = response.get('Item')
 
     if not item:
+        log.warning(json.dumps({'action': 'validate_student_not_found', 'userId': user_id, 'tenantId': tenant_id}))
         raise StudentNotFound(f'User {user_id} not found in tenant {tenant_id}')
 
     if item.get('tenantId') != tenant_id:
+        log.warning(json.dumps({'action': 'validate_student_tenant_mismatch', 'userId': user_id, 'tenantId': tenant_id}))
         raise TenantMismatch(f'User {user_id} does not belong to tenant {tenant_id}')
 
     if item.get('role') != 'student':
+        log.warning(json.dumps({'action': 'validate_student_not_student', 'userId': user_id, 'role': item.get('role')}))
         raise StudentNotFound(f'User {user_id} is not a student')
 
     if item.get('status') != 'active':
+        log.warning(json.dumps({'action': 'validate_student_inactive', 'userId': user_id, 'tenantId': tenant_id}))
         raise StudentInactive(f'User {user_id} is inactive')
+
+    log.info(json.dumps({'action': 'validate_student_ok', 'userId': user_id, 'tenantId': tenant_id}))
 
     return {
         'userId':   item['userId'],
@@ -60,8 +52,6 @@ def handler(event, context):
         'status':   item['status'],
     }
 
-
-# ─── Excepciones nombradas (Step Functions las captura por nombre) ─────────────
 
 class ValidationError(Exception):
     pass
