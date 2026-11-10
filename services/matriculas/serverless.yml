@@ -148,8 +148,8 @@ stepFunctions:
 
           EnrollmentFailed:
             Type: Fail
-            CausePath: "$.error.message"
-            ErrorPath: "$.error.code"
+            CausePath: "$.error.Cause"
+            ErrorPath: "$.error.Error"
 
 resources:
   Resources:
