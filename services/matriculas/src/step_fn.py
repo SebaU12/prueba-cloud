@@ -99,11 +99,9 @@ def handler(event, context):
         ])
     except ClientError as e:
         if e.response['Error']['Code'] == 'TransactionCanceledException':
-            reasons = e.response.get('CancellationReasons', [])
-            if any(r.get('Code') == 'ConditionalCheckFailed' for r in reasons):
-                raise EnrollmentDuplicate(
-                    f'Student {student_id} is already enrolled in course {course_id}'
-                )
+            raise EnrollmentDuplicate(
+                f'Student {student_id} is already enrolled in course {course_id}'
+            )
         raise
 
     return {
