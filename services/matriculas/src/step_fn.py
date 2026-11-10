@@ -69,7 +69,7 @@ def handler(event, context):
                 'Put': {
                     'TableName': table.name,
                     'Item':      _ddb(enrollment_item),
-                    'ConditionExpression': 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+                    'ConditionExpression': 'attribute_not_exists(pk)',
                 },
             },
             {
@@ -81,12 +81,17 @@ def handler(event, context):
         ])
     except ClientError as e:
         if e.response['Error']['Code'] == 'TransactionCanceledException':
-            reasons = [r.get('Code', 'Unknown') for r in e.response.get('CancellationReasons', [])]
-            log.warning(json.dumps({'action': 'enrollment_duplicate', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id, 'cancellationReasons': reasons}))
-            raise EnrollmentDuplicate(
-                f'Student {student_id} is already enrolled in course {course_id}'
-            )
-        log.error(json.dumps({'action': 'enrollment_transaction_error', 'studentId': student_id, 'courseId': course_id, 'error': str(e)}))
+            reasons = e.response.get('CancellationReasons', [])
+            codes   = [r.get('Code', 'None') for r in reasons]
+            # El primer item del transact es el enrollment — solo es duplicado si ese falla la condición
+            if reasons and reasons[0].get('Code') == 'ConditionalCheckFailed':
+                log.warning(json.dumps({'action': 'enrollment_duplicate', 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id}))
+                raise EnrollmentDuplicate(
+                    f'Student {student_id} is already enrolled in course {course_id}'
+                )
+            log.error(json.dumps({'action': 'enrollment_transaction_cancelled', 'studentId': student_id, 'courseId': course_id, 'cancellationReasons': codes}))
+        else:
+            log.error(json.dumps({'action': 'enrollment_transaction_error', 'studentId': student_id, 'courseId': course_id, 'error': str(e)}))
         raise
 
     log.info(json.dumps({'action': 'enrollment_created', 'enrollmentId': enrollment_id, 'studentId': student_id, 'courseId': course_id, 'tenantId': tenant_id}))
