@@ -1,0 +1,22 @@
+meta {
+  name: LMS - Crear curso
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://290ukd638e.execute-api.us-east-1.amazonaws.com/dev/v1/courses
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: 86F1dqwnl8psNfC7Jqb4-6-takPLL7sJmslCcixn4PI
+}
+
+body:json {
+  {
+    "title": "Introducción a Cloud Computing 4",
+    "description": "Curso de fundamentos de cloud con AWS"
+  }
+}

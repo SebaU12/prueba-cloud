@@ -1,0 +1,23 @@
+meta {
+  name: LMS - Crear usuario
+  type: http
+  seq: 4
+}
+
+post {
+  url: https://bqr9yndpkh.execute-api.us-east-1.amazonaws.com/dev/v1/users
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: YLFWAOMl828aT_G2eb9C3UJZFVaUsj3FHBuyCwbFBGw
+}
+
+body:json {
+  {
+    "email": "student@tenant-a.edu",
+    "password": "StudentA-Seguro-2026!",
+    "role": "student"
+  }
+}

@@ -1,0 +1,11 @@
+meta {
+  name: LMS - Listar matriculas por alumno
+  type: http
+  seq: 3
+}
+
+get {
+  url: https://hg230hgizk.execute-api.us-east-1.amazonaws.com/dev/v1/enrollments?studentId=USR-A-00201
+  body: none
+  auth: inherit
+}

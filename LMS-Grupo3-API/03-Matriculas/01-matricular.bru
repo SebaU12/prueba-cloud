@@ -1,0 +1,21 @@
+meta {
+  name: LMS - Matricular alumno
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://hg230hgizk.execute-api.us-east-1.amazonaws.com/dev/v1/enrollments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: 5-vVSlquAPrlDJ4qfXVVfiwxQgyinrOXeVr00ftCzcA
+}
+
+body:json {
+  {
+    "courseId": "CRS-A-D4D01A0C"
+  }
+}

@@ -1,0 +1,11 @@
+meta {
+  name: LMS - Listar matriculas por curso
+  type: http
+  seq: 4
+}
+
+get {
+  url: https://hg230hgizk.execute-api.us-east-1.amazonaws.com/dev/v1/enrollments?courseId=CRS-A-00001
+  body: none
+  auth: inherit
+}

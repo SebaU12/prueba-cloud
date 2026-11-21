@@ -85,6 +85,8 @@
 | GET | `/v1/evaluations` | Bearer | Listar evaluaciones |
 | GET | `/v1/evaluations/{evaluationId}` | Bearer | Obtener evaluación |
 | PATCH | `/v1/evaluations/{evaluationId}` | Bearer (admin/teacher dueño) | Actualizar evaluación |
+| POST | `/v1/evaluations/{evaluationId}/submit` | Bearer (student) | Enviar respuestas del quiz |
+| GET | `/v1/evaluations/{evaluationId}/result` | Bearer | Ver calificación (student=propia; teacher/admin=?studentId=) |
 
 ## Credenciales de prueba
 

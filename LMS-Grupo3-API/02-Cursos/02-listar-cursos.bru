@@ -1,0 +1,19 @@
+meta {
+  name: LMS - Listar cursos
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://290ukd638e.execute-api.us-east-1.amazonaws.com/dev/v1/courses?nextToken=eyJwayI6ICJURU5BTlQjVEVOQU5UX0EiLCAic2siOiAiQ09VUlNFI0NSUy1BLTAwMDIwIn0=
+  body: none
+  auth: bearer
+}
+
+params:query {
+  nextToken: eyJwayI6ICJURU5BTlQjVEVOQU5UX0EiLCAic2siOiAiQ09VUlNFI0NSUy1BLTAwMDIwIn0=
+}
+
+auth:bearer {
+  token: 86F1dqwnl8psNfC7Jqb4-6-takPLL7sJmslCcixn4PI
+}

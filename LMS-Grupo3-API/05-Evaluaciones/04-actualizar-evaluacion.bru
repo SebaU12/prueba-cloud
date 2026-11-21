@@ -1,0 +1,17 @@
+meta {
+  name: LMS - Actualizar evaluacion
+  type: http
+  seq: 4
+}
+
+patch {
+  url: https://c1b3902w19.execute-api.us-east-1.amazonaws.com/dev/v1/evaluations/EVL-A-00001
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "status": "published"
+  }
+}

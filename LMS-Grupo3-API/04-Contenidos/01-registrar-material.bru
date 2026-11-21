@@ -1,0 +1,20 @@
+meta {
+  name: LMS - Registrar material
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://ainxkn7mq0.execute-api.us-east-1.amazonaws.com/dev/v1/materials
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "courseId": "CRS-A-00001",
+    "title": "Introducción a Lambda",
+    "fileName": "lambda-intro.pdf",
+    "mimeType": "application/pdf"
+  }
+}

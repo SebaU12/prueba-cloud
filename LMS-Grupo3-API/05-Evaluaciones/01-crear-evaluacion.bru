@@ -1,0 +1,30 @@
+meta {
+  name: LMS - Crear evaluacion
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://c1b3902w19.execute-api.us-east-1.amazonaws.com/dev/v1/evaluations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "courseId": "CRS-A-00001",
+    "title": "Quiz Semana 1",
+    "questions": [
+      {
+        "text": "¿Qué es serverless?",
+        "options": ["Sin servidor físico", "Sin internet", "Sin código", "Sin DB"],
+        "correctIndex": 0
+      },
+      {
+        "text": "¿Qué servicio de AWS ejecuta funciones?",
+        "options": ["EC2", "Lambda", "S3", "RDS"],
+        "correctIndex": 1
+      }
+    ]
+  }
+}

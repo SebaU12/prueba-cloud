@@ -1,0 +1,21 @@
+meta {
+  name: LMS - Actualizar curso
+  type: http
+  seq: 5
+}
+
+patch {
+  url: https://290ukd638e.execute-api.us-east-1.amazonaws.com/dev/v1/courses/CRS-A-D4D01A0C
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: 86F1dqwnl8psNfC7Jqb4-6-takPLL7sJmslCcixn4PI
+}
+
+body:json {
+  {
+    "status": "published"
+  }
+}

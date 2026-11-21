@@ -272,3 +272,96 @@ def get_evaluation(event, context):
             return _error('FORBIDDEN', 'You are not enrolled in this course')
 
     return _ok(_public_eval(item, role))
+
+
+def submit_quiz(event, context):
+    auth      = _auth(event)
+    tenant_id = auth.get('tenantId')
+    user_id   = auth.get('userId')
+    role      = auth.get('role')
+    eval_id   = _path(event).get('evaluationId')
+
+    if role != 'student':
+        return _error('FORBIDDEN', 'Only students can submit quizzes')
+
+    item = _get_eval_by_id(tenant_id, eval_id)
+    if not item or item.get('status') != 'published':
+        return _error('NOT_FOUND', 'Evaluation not found')
+
+    if not _is_enrolled(tenant_id, item['courseId'], user_id):
+        log.warning(json.dumps({'action': 'submit_quiz_not_enrolled', 'evaluationId': eval_id, 'userId': user_id, 'tenantId': tenant_id}))
+        return _error('FORBIDDEN', 'You are not enrolled in this course')
+
+    existing = table.get_item(Key={
+        'pk': f'TENANT#{tenant_id}#EVAL#{eval_id}',
+        'sk': f'RESULT#STUDENT#{user_id}',
+    }).get('Item')
+    if existing:
+        return _error('CONFLICT', 'You have already submitted this evaluation')
+
+    body      = _body(event)
+    answers   = body.get('answers', [])
+    questions = item.get('questions', [])
+
+    if len(answers) != len(questions):
+        return _error('INVALID_BODY', f'Expected {len(questions)} answers, got {len(answers)}')
+
+    correct = sum(
+        1 for i, q in enumerate(questions)
+        if answers[i] == q.get('correctIndex')
+    )
+    total = len(questions)
+    score = round(correct / total * 100, 2) if total > 0 else 0
+
+    now = _now_iso()
+    result_item = {
+        'pk':             f'TENANT#{tenant_id}#EVAL#{eval_id}',
+        'sk':             f'RESULT#STUDENT#{user_id}',
+        'entityType':     'RESULT',
+        'evaluationId':   eval_id,
+        'studentId':      user_id,
+        'tenantId':       tenant_id,
+        'answers':        answers,
+        'correctAnswers': correct,
+        'totalQuestions': total,
+        'score':          decimal.Decimal(str(score)),
+        'submittedAt':    now,
+    }
+
+    table.put_item(Item=result_item)
+
+    log.info(json.dumps({'action': 'submit_quiz_ok', 'evaluationId': eval_id, 'studentId': user_id, 'score': score, 'tenantId': tenant_id}))
+
+    return _ok({
+        'evaluationId':   eval_id,
+        'score':          score,
+        'correctAnswers': correct,
+        'totalQuestions': total,
+        'submittedAt':    now,
+    })
+
+
+def get_result(event, context):
+    auth      = _auth(event)
+    tenant_id = auth.get('tenantId')
+    user_id   = auth.get('userId')
+    role      = auth.get('role')
+    eval_id   = _path(event).get('evaluationId')
+
+    if role == 'student':
+        student_id = user_id
+    else:
+        student_id = _query(event).get('studentId')
+        if not student_id:
+            return _error('INVALID_BODY', 'studentId query param is required')
+
+    result = table.get_item(Key={
+        'pk': f'TENANT#{tenant_id}#EVAL#{eval_id}',
+        'sk': f'RESULT#STUDENT#{student_id}',
+    }).get('Item')
+
+    if not result:
+        return _error('NOT_FOUND', 'Result not found')
+
+    public = {k: v for k, v in result.items() if k not in ('pk', 'sk')}
+    return _ok(public)

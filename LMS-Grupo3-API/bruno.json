@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "name": "LMS Grupo 3",
+  "type": "collection",
+  "auth": {
+    "mode": "bearer",
+    "bearer": {
+      "token": "{{token}}"
+    }
+  }
+}

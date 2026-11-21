@@ -71,6 +71,34 @@ functions:
             identitySource: method.request.header.Authorization
             type: request
 
+  submitQuiz:
+    handler: src/handlers.submit_quiz
+    events:
+      - http:
+          path: /v1/evaluations/{evaluationId}/submit
+          method: post
+          cors: true
+
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
+  getResult:
+    handler: src/handlers.get_result
+    events:
+      - http:
+          path: /v1/evaluations/{evaluationId}/result
+          method: get
+          cors: true
+
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
 resources:
   Resources:
 
