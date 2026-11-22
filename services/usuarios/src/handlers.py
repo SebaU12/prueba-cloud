@@ -305,3 +305,31 @@ def get_user(event, context):
         return _error('NOT_FOUND', 'User not found')
 
     return _ok(_safe_user(item))
+
+
+def delete_user(event, context):
+    auth      = _auth(event)
+    tenant_id = auth.get('tenantId')
+    caller_id = auth.get('userId')
+    role      = auth.get('role')
+    target_id = _path(event).get('userId')
+
+    if role != 'tenant_admin':
+        return _error('FORBIDDEN', 'Only admins can delete users')
+
+    if caller_id == target_id:
+        return _error('FORBIDDEN', 'You cannot delete your own account')
+
+    item = table.get_item(
+        Key={'pk': f'TENANT#{tenant_id}', 'sk': f'USER#{target_id}'},
+    ).get('Item')
+
+    if not item:
+        return _error('NOT_FOUND', 'User not found')
+
+    table.delete_item(Key={'pk': f'TENANT#{tenant_id}', 'sk': f'USER#{target_id}'})
+    table.delete_item(Key={'pk': f'EMAIL#{item["email"]}', 'sk': 'LOOKUP'})
+
+    log.info(json.dumps({'action': 'delete_user_ok', 'targetId': target_id, 'callerId': caller_id, 'tenantId': tenant_id}))
+
+    return _ok({'userId': target_id, 'deleted': True})

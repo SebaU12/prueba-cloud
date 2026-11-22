@@ -77,6 +77,20 @@ functions:
             identitySource: method.request.header.Authorization
             type: request
 
+  deleteCourse:
+    handler: src/handlers.delete_course
+    events:
+      - http:
+          path: /v1/courses/{courseId}
+          method: delete
+          cors: true
+
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
 resources:
   Resources:
 

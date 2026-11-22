@@ -5,13 +5,34 @@ meta {
 }
 
 patch {
-  url: https://c1b3902w19.execute-api.us-east-1.amazonaws.com/dev/v1/evaluations/EVL-A-00001
+  url: https://c1b3902w19.execute-api.us-east-1.amazonaws.com/dev/v1/evaluations/EVL-5a6434c7-e090-4d90-9448-2cec402fd056
   body: json
-  auth: inherit
+  auth: bearer
+}
+
+auth:bearer {
+  token: EQcSBN8Bc2lLfU8tRvYjNgRB2vqSYXR8RU3UrQ8BsAw
 }
 
 body:json {
   {
+    "questions": [
+      {
+        "text": "¿Qué es serverless?",
+        "options": ["Sin servidor físico", "Sin internet", "Sin código", "Sin DB"],
+        "correctIndex": 0
+      },
+      {
+        "text": "¿Qué servicio de AWS ejecuta funciones?",
+        "options": ["EC2", "Lambda", "S3", "RDS"],
+        "correctIndex": 1
+      },
+      {
+        "text": "¿Qué es DynamoDB?",
+        "options": ["Base relacional", "Base NoSQL", "Cola de mensajes", "CDN"],
+        "correctIndex": 1
+      }
+    ],
     "status": "published"
   }
 }

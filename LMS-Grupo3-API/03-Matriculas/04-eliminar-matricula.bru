@@ -1,0 +1,11 @@
+meta {
+  name: LMS - Eliminar matricula
+  type: http
+  seq: 4
+}
+
+delete {
+  url: https://hg230hgizk.execute-api.us-east-1.amazonaws.com/dev/v1/enrollments?courseId=CRS-A-00001&studentId=USR-A-00201
+  body: none
+  auth: inherit
+}

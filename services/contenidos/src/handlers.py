@@ -263,3 +263,34 @@ def get_download_url(event, context):
     log.info(json.dumps({'action': 'download_url_generated', 'contentId': content_id, 'userId': user_id, 'tenantId': tenant_id}))
 
     return _ok({'downloadUrl': download_url, 'expiresIn': 60})
+
+
+def delete_material(event, context):
+    auth       = _auth(event)
+    tenant_id  = auth.get('tenantId')
+    user_id    = auth.get('userId')
+    role       = auth.get('role')
+    content_id = _path(event).get('contentId')
+
+    if role not in ('tenant_admin', 'teacher'):
+        return _error('FORBIDDEN', 'Only admins and teachers can delete materials')
+
+    item = _get_content_by_id(tenant_id, content_id)
+    if not item:
+        return _error('NOT_FOUND', 'Content not found')
+
+    if role == 'teacher' and item.get('uploadedBy') != user_id:
+        log.warning(json.dumps({'action': 'delete_material_forbidden', 'contentId': content_id, 'userId': user_id, 'tenantId': tenant_id}))
+        return _error('FORBIDDEN', 'Teachers can only delete their own materials')
+
+    if item.get('uploadStatus') == 'confirmed' and item.get('s3Key'):
+        try:
+            s3.delete_object(Bucket=S3_BUCKET, Key=item['s3Key'])
+        except Exception as e:
+            log.warning(json.dumps({'action': 'delete_material_s3_warn', 'contentId': content_id, 's3Key': item['s3Key'], 'error': str(e)}))
+
+    table.delete_item(Key={'pk': item['pk'], 'sk': item['sk']})
+
+    log.info(json.dumps({'action': 'delete_material_ok', 'contentId': content_id, 'userId': user_id, 'tenantId': tenant_id}))
+
+    return _ok({'contentId': content_id, 'deleted': True})

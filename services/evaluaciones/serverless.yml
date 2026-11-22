@@ -99,6 +99,20 @@ functions:
             identitySource: method.request.header.Authorization
             type: request
 
+  deleteEvaluation:
+    handler: src/handlers.delete_evaluation
+    events:
+      - http:
+          path: /v1/evaluations/{evaluationId}
+          method: delete
+          cors: true
+
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
 resources:
   Resources:
 

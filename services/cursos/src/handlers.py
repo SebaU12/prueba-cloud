@@ -218,3 +218,31 @@ def update_course(event, context):
     log.info(json.dumps({'action': 'update_course_ok', 'courseId': course_id, 'userId': user_id, 'tenantId': tenant_id}))
 
     return _ok(_public_course(result['Attributes']))
+
+
+def delete_course(event, context):
+    auth      = _auth(event)
+    tenant_id = auth.get('tenantId')
+    user_id   = auth.get('userId')
+    role      = auth.get('role')
+    course_id = _path(event).get('courseId')
+
+    if role not in ('tenant_admin', 'teacher'):
+        return _error('FORBIDDEN', 'Only admins and teachers can delete courses')
+
+    item = table.get_item(
+        Key={'pk': f'TENANT#{tenant_id}', 'sk': f'COURSE#{course_id}'},
+    ).get('Item')
+
+    if not item:
+        return _error('NOT_FOUND', 'Course not found')
+
+    if role == 'teacher' and item.get('teacherId') != user_id:
+        log.warning(json.dumps({'action': 'delete_course_forbidden', 'courseId': course_id, 'userId': user_id, 'tenantId': tenant_id}))
+        return _error('FORBIDDEN', 'Teachers can only delete their own courses')
+
+    table.delete_item(Key={'pk': f'TENANT#{tenant_id}', 'sk': f'COURSE#{course_id}'})
+
+    log.info(json.dumps({'action': 'delete_course_ok', 'courseId': course_id, 'userId': user_id, 'tenantId': tenant_id}))
+
+    return _ok({'courseId': course_id, 'deleted': True})

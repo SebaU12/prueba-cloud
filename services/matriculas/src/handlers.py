@@ -162,5 +162,41 @@ def list_enrollments(event, context):
     return _ok({'items': items, 'nextToken': next_token})
 
 
+def delete_enrollment(event, context):
+    auth      = _auth(event)
+    tenant_id = auth.get('tenantId')
+    user_id   = auth.get('userId')
+    role      = auth.get('role')
+
+    if role != 'tenant_admin':
+        return _error('FORBIDDEN', 'Only admins can delete enrollments')
+
+    query      = _query(event)
+    course_id  = (query.get('courseId') or '').strip()
+    student_id = (query.get('studentId') or '').strip()
+
+    if not course_id or not student_id:
+        return _error('INVALID_BODY', 'courseId and studentId query params are required')
+
+    item = table.get_item(
+        Key={
+            'pk': f'TENANT#{tenant_id}#COURSE#{course_id}',
+            'sk': f'STUDENT#{student_id}',
+        }
+    ).get('Item')
+
+    if not item:
+        return _error('NOT_FOUND', 'Enrollment not found')
+
+    table.delete_item(Key={
+        'pk': f'TENANT#{tenant_id}#COURSE#{course_id}',
+        'sk': f'STUDENT#{student_id}',
+    })
+
+    log.info(json.dumps({'action': 'delete_enrollment_ok', 'courseId': course_id, 'studentId': student_id, 'callerId': user_id, 'tenantId': tenant_id}))
+
+    return _ok({'courseId': course_id, 'studentId': student_id, 'deleted': True})
+
+
 def _public_enrollment(item):
     return {k: v for k, v in item.items() if k not in ('pk', 'sk', 'GSI1PK', 'GSI1SK')}

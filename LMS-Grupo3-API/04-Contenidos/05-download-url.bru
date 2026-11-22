@@ -1,11 +1,15 @@
 meta {
   name: LMS - Obtener URL de descarga (S3)
   type: http
-  seq: 5
+  seq: 6
 }
 
 get {
-  url: https://ainxkn7mq0.execute-api.us-east-1.amazonaws.com/dev/v1/materials/CNT-A-00001/download-url
+  url: https://ainxkn7mq0.execute-api.us-east-1.amazonaws.com/dev/v1/materials/CNT-c4ececef-c22b-4d0c-bf86-67f393f97913/download-url
   body: none
-  auth: inherit
+  auth: bearer
+}
+
+auth:bearer {
+  token: c1gr5qDveam1Gje_VVt5CEqdj3P9OVvVVfFTNIyC1MA
 }

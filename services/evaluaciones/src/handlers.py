@@ -365,3 +365,31 @@ def get_result(event, context):
 
     public = {k: v for k, v in result.items() if k not in ('pk', 'sk')}
     return _ok(public)
+
+
+def delete_evaluation(event, context):
+    auth      = _auth(event)
+    tenant_id = auth.get('tenantId')
+    user_id   = auth.get('userId')
+    role      = auth.get('role')
+    eval_id   = _path(event).get('evaluationId')
+
+    if role not in ('tenant_admin', 'teacher'):
+        return _error('FORBIDDEN', 'Only admins and teachers can delete evaluations')
+
+    item = _get_eval_by_id(tenant_id, eval_id)
+    if not item:
+        return _error('NOT_FOUND', 'Evaluation not found')
+
+    if role == 'teacher':
+        if item.get('teacherId') != user_id:
+            log.warning(json.dumps({'action': 'delete_evaluation_forbidden', 'evaluationId': eval_id, 'userId': user_id, 'tenantId': tenant_id}))
+            return _error('FORBIDDEN', 'Teachers can only delete their own evaluations')
+        if item.get('status') != 'draft':
+            return _error('CONFLICT', 'Teachers can only delete draft evaluations')
+
+    table.delete_item(Key={'pk': item['pk'], 'sk': item['sk']})
+
+    log.info(json.dumps({'action': 'delete_evaluation_ok', 'evaluationId': eval_id, 'userId': user_id, 'tenantId': tenant_id}))
+
+    return _ok({'evaluationId': eval_id, 'deleted': True})

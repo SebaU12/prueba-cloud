@@ -50,6 +50,7 @@
 | POST | `/v1/users` | Bearer (admin) | Crear usuario |
 | GET | `/v1/users` | Bearer (admin) | Listar usuarios |
 | GET | `/v1/users/{userId}` | Bearer | Obtener usuario |
+| DELETE | `/v1/users/{userId}` | Bearer (admin) | Eliminar usuario |
 
 ### Cursos — `https://290ukd638e.execute-api.us-east-1.amazonaws.com/dev`
 
@@ -59,6 +60,7 @@
 | GET | `/v1/courses` | Bearer | Listar cursos |
 | GET | `/v1/courses/{courseId}` | Bearer | Obtener curso |
 | PATCH | `/v1/courses/{courseId}` | Bearer (admin/teacher dueño) | Actualizar curso |
+| DELETE | `/v1/courses/{courseId}` | Bearer (admin/teacher dueño) | Eliminar curso |
 
 ### Matrículas — `https://hg230hgizk.execute-api.us-east-1.amazonaws.com/dev`
 
@@ -66,6 +68,7 @@
 |---|---|---|---|
 | POST | `/v1/enrollments` | Bearer (admin/student) | Matricular |
 | GET | `/v1/enrollments` | Bearer | Listar matrículas |
+| DELETE | `/v1/enrollments?courseId=X&studentId=Y` | Bearer (admin) | Eliminar matrícula |
 
 ### Contenidos — `https://ainxkn7mq0.execute-api.us-east-1.amazonaws.com/dev`
 
@@ -76,6 +79,7 @@
 | POST | `/v1/materials/{contentId}/upload-url` | Bearer | Presigned URL para subir |
 | POST | `/v1/materials/{contentId}/confirm` | Bearer | Confirmar upload |
 | GET | `/v1/materials/{contentId}/download-url` | Bearer | Presigned URL para bajar |
+| DELETE | `/v1/materials/{contentId}` | Bearer (admin/teacher dueño) | Eliminar material + S3 |
 
 ### Evaluaciones — `https://c1b3902w19.execute-api.us-east-1.amazonaws.com/dev`
 
@@ -85,6 +89,7 @@
 | GET | `/v1/evaluations` | Bearer | Listar evaluaciones |
 | GET | `/v1/evaluations/{evaluationId}` | Bearer | Obtener evaluación |
 | PATCH | `/v1/evaluations/{evaluationId}` | Bearer (admin/teacher dueño) | Actualizar evaluación |
+| DELETE | `/v1/evaluations/{evaluationId}` | Bearer (admin / teacher dueño en draft) | Eliminar evaluación |
 | POST | `/v1/evaluations/{evaluationId}/submit` | Bearer (student) | Enviar respuestas del quiz |
 | GET | `/v1/evaluations/{evaluationId}/result` | Bearer | Ver calificación (student=propia; teacher/admin=?studentId=) |
 

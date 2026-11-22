@@ -86,6 +86,20 @@ functions:
             identitySource: method.request.header.Authorization
             type: request
 
+  deleteMaterial:
+    handler: src/handlers.delete_material
+    events:
+      - http:
+          path: /v1/materials/{contentId}
+          method: delete
+          cors: true
+
+          authorizer:
+            arn: ${env:AUTHORIZER_LAMBDA_ARN}
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
 resources:
   Resources:
 

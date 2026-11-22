@@ -104,6 +104,20 @@ functions:
             identitySource: method.request.header.Authorization
             type: request
 
+  deleteUser:
+    handler: src/handlers.delete_user
+    events:
+      - http:
+          path: /v1/users/{userId}
+          method: delete
+          cors: true
+
+          authorizer:
+            name: authorizer
+            resultTtlInSeconds: 0
+            identitySource: method.request.header.Authorization
+            type: request
+
 resources:
   Resources:
 
